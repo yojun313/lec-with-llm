@@ -155,25 +155,4 @@ All output is written in Markdown format.
 
 ---
 
-## 7. Notes and Limitations
-
-* The ZIP file must contain image files only.
-* Duplicate image names may overwrite files.
-* Processing time depends on the number of images and model speed.
-* The vLLM server must be running before execution.
-* If an error occurs during processing, some slides may be skipped.
-
----
-
-## 8. Recommended Workflow
-
-1. Export PPT slides as images
-2. Compress images into a ZIP file
-3. Place the ZIP file in the `data/` directory
-4. Run the script
-5. Select the desired output mode
-6. Review results in the `result/` directory
-
----
-
 This tool is designed to help convert presentation slides into structured, readable documentation using a local vision-language model.

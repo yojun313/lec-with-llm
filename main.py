@@ -5,6 +5,10 @@ import requests
 import base64
 from dotenv import load_dotenv
 
+from rich.console import Console
+from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn, TimeElapsedColumn
+from rich.panel import Panel
+
 # =============================
 # 환경 설정
 # =============================
@@ -23,6 +27,8 @@ DATA_DIR = os.path.join(SCRIPT_DIR, "data")
 RESULT_DIR = os.path.join(SCRIPT_DIR, "result")
 
 IMAGE_EXTS = (".png", ".jpg", ".jpeg")
+
+console = Console()
 
 
 # =============================
@@ -64,24 +70,23 @@ def describe_image(model_id, image_path):
     image_data_url = image_to_data_url(image_path)
 
     prompt = f"""
-        이 이미지는 발표용 PPT 슬라이드 한 장이다.
+이 이미지는 발표용 PPT 슬라이드 한 장이다.
 
-        이 슬라이드를 분석하여 README.md에 들어갈 설명을 작성하라.
+이 슬라이드를 분석하여 README.md에 들어갈 설명을 작성하라.
 
-        출력 규칙:
-        - 반드시 Markdown 형식으로 작성한다.
-        - 제목은 "## {filename}" 형식으로 시작한다.
-        - 한국어로 작성한다.
-        - 불필요한 인사말이나 메타 설명은 쓰지 않는다.
-        - 코드 블록은 사용하지 않는다.
+출력 규칙:
+- 반드시 Markdown 형식으로 작성한다.
+- 제목은 "## {filename}" 형식으로 시작한다.
+- 한국어로 작성한다.
+- 불필요한 인사말이나 메타 설명, 이모티콘은 쓰지 않는다.
+- 코드 블록은 사용하지 않는다.
 
-        설명에는 다음을 포함한다:
-        - 슬라이드의 주제
-        - 핵심 내용 요약
-        - 도표나 그림의 의미
-        - 전달하려는 핵심 메시지
-        - 전공 ppt 슬라이드에 대한 자세한 설명
-    """
+설명에는 다음을 포함한다:
+- 슬라이드의 주제
+- 핵심 내용 요약
+- 도표나 그림의 의미
+- 전공 PPT 슬라이드에 대한 자세한 설명
+"""
 
     payload = {
         "model": model_id,
@@ -92,9 +97,7 @@ def describe_image(model_id, image_path):
                     {"type": "text", "text": prompt},
                     {
                         "type": "image_url",
-                        "image_url": {
-                            "url": image_data_url
-                        }
+                        "image_url": {"url": image_data_url},
                     }
                 ],
             }
@@ -122,78 +125,98 @@ def process_zip(zip_path, model_id):
     output_dir = os.path.join(RESULT_DIR, zip_name)
     os.makedirs(output_dir, exist_ok=True)
 
-    print(f"\n📦 처리 시작: {zip_name}")
-    print(f"📁 결과 폴더: {output_dir}")
+    console.print(
+        Panel.fit(
+            f"[bold cyan]📦 처리 시작[/bold cyan]\n[white]{zip_name}[/white]",
+            title="ZIP",
+        )
+    )
 
     with tempfile.TemporaryDirectory() as tmp:
         with zipfile.ZipFile(zip_path, "r") as z:
             z.extractall(tmp)
 
+        images = []
         for root, _, files in os.walk(tmp):
-            for fname in sorted(files):
-                if not fname.lower().endswith(IMAGE_EXTS):
-                    continue
+            for f in sorted(files):
+                if f.lower().endswith(IMAGE_EXTS):
+                    images.append(os.path.join(root, f))
 
-                img_path = os.path.join(root, fname)
+        if not images:
+            console.print("[yellow]⚠ 이미지가 없습니다.[/yellow]")
+            return
+
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[bold blue]{task.description}"),
+            BarColumn(),
+            TextColumn("{task.completed}/{task.total}"),
+            TimeElapsedColumn(),
+            console=console,
+        ) as progress:
+
+            task = progress.add_task("이미지 처리 중...", total=len(images))
+
+            for img_path in images:
+                fname = os.path.basename(img_path)
                 md_path = os.path.join(
                     output_dir,
                     os.path.splitext(fname)[0] + ".md"
                 )
 
-                print(f"  🖼 {fname}")
-
                 try:
                     text = describe_image(model_id, img_path)
+                    with open(md_path, "w", encoding="utf-8") as f:
+                        f.write(text.strip() + "\n")
+
+                    progress.console.print(
+                        f"  ✅ [green]{fname}[/green] → 저장 완료"
+                    )
                 except Exception as e:
-                    print(f"    ❌ 실패: {e}")
-                    continue
+                    progress.console.print(
+                        f"  ❌ [red]{fname} 실패:[/red] {e}"
+                    )
 
-                with open(md_path, "w", encoding="utf-8") as f:
-                    f.write(text.strip() + "\n")
-
-                print(f"    ✅ 저장됨 → {md_path}")
+                progress.advance(task)
 
 
 # =============================
-# 메인 진입점
+# 메인
 # =============================
 def main():
     if not os.path.isdir(DATA_DIR):
-        print("❌ data 폴더가 없습니다.")
+        console.print("[red]❌ data 폴더가 없습니다.[/red]")
         return
 
     os.makedirs(RESULT_DIR, exist_ok=True)
 
-    zip_files = sorted(
-        f for f in os.listdir(DATA_DIR)
-        if f.lower().endswith(".zip")
-    )
+    zip_files = sorted(f for f in os.listdir(DATA_DIR) if f.lower().endswith(".zip"))
 
     if not zip_files:
-        print("❌ data 폴더에 zip 파일이 없습니다.")
+        console.print("[red]❌ data 폴더에 zip 파일이 없습니다.[/red]")
         return
 
-    print("\n📦 처리할 ZIP 파일 목록:")
+    console.print("\n[bold cyan]📦 처리할 ZIP 파일 목록[/bold cyan]")
     for i, name in enumerate(zip_files, 1):
-        print(f"  [{i}] {name}")
-    print("  [a] 전체 처리")
+        console.print(f"  [cyan]{i}[/cyan]. {name}")
+    console.print("  [cyan]a[/cyan]. 전체 처리")
 
-    choice = input("\n선택: ").strip().lower()
+    choice = console.input("\n👉 선택: ").strip().lower()
 
     model_id = get_model_id()
-    print(f"\n✅ 사용 중인 모델: {model_id}")
+    console.print(f"\n✅ 사용 중인 모델: [bold]{model_id}[/bold]")
 
     if choice == "a":
         for z in zip_files:
             process_zip(os.path.join(DATA_DIR, z), model_id)
     else:
         if not choice.isdigit():
-            print("❌ 잘못된 입력")
+            console.print("[red]❌ 잘못된 입력[/red]")
             return
 
         idx = int(choice) - 1
         if idx < 0 or idx >= len(zip_files):
-            print("❌ 잘못된 번호")
+            console.print("[red]❌ 잘못된 번호[/red]")
             return
 
         process_zip(os.path.join(DATA_DIR, zip_files[idx]), model_id)

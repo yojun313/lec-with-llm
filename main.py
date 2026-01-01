@@ -78,14 +78,15 @@ def describe_image(model_id, image_path):
 - 반드시 Markdown 형식으로 작성한다.
 - 제목은 "## {filename}" 형식으로 시작한다.
 - 한국어로 작성한다.
-- 불필요한 인사말이나 메타 설명, 이모티콘은 쓰지 않는다.
+- 불필요한 인사말, 메타 설명, 이모티콘은 쓰지 않는다.
 - 코드 블록은 사용하지 않는다.
 
 설명에는 다음을 포함한다:
 - 슬라이드의 주제
 - 핵심 내용 요약
 - 도표나 그림의 의미
-- 전공 PPT 슬라이드에 대한 자세한 설명
+- 전공 ppt에 대한 자세한 설명
+이것들을 포함해서 최대한 길고 자세하게 설명해줘. 
 """
 
     payload = {
@@ -118,9 +119,9 @@ def describe_image(model_id, image_path):
 
 
 # =============================
-# zip 하나 처리
+# zip 처리
 # =============================
-def process_zip(zip_path, model_id):
+def process_zip(zip_path, model_id, merge_mode: bool):
     zip_name = os.path.splitext(os.path.basename(zip_path))[0]
     output_dir = os.path.join(RESULT_DIR, zip_name)
     os.makedirs(output_dir, exist_ok=True)
@@ -131,6 +132,12 @@ def process_zip(zip_path, model_id):
             title="ZIP",
         )
     )
+
+    readme_path = os.path.join(output_dir, "README.md") if merge_mode else None
+
+    if merge_mode:
+        readme_file = open(readme_path, "w", encoding="utf-8")
+        readme_file.write(f"# {zip_name}\n\n")
 
     with tempfile.TemporaryDirectory() as tmp:
         with zipfile.ZipFile(zip_path, "r") as z:
@@ -159,25 +166,36 @@ def process_zip(zip_path, model_id):
 
             for img_path in images:
                 fname = os.path.basename(img_path)
-                md_path = os.path.join(
-                    output_dir,
-                    os.path.splitext(fname)[0] + ".md"
-                )
+                md_name = os.path.splitext(fname)[0] + ".md"
+                md_path = os.path.join(output_dir, md_name)
 
                 try:
                     text = describe_image(model_id, img_path)
+                except Exception as e:
+                    progress.console.print(f"  ❌ [red]{fname} 실패:[/red] {e}")
+                    progress.advance(task)
+                    continue
+
+                if merge_mode:
+                    # 이미지 복사
+                    target_img = os.path.join(output_dir, fname)
+                    with open(img_path, "rb") as src, open(target_img, "wb") as dst:
+                        dst.write(src.read())
+
+                    readme_file.write(f"## {fname}\n\n")
+                    readme_file.write(f"![{fname}]({fname})\n\n")
+                    readme_file.write(text.strip() + "\n\n---\n\n")
+
+                else:
                     with open(md_path, "w", encoding="utf-8") as f:
                         f.write(text.strip() + "\n")
 
-                    progress.console.print(
-                        f"  ✅ [green]{fname}[/green] → 저장 완료"
-                    )
-                except Exception as e:
-                    progress.console.print(
-                        f"  ❌ [red]{fname} 실패:[/red] {e}"
-                    )
-
+                progress.console.print(f"  ✅ [green]{fname}[/green] 완료")
                 progress.advance(task)
+
+    if merge_mode:
+        readme_file.close()
+        console.print(f"\n📘 README 생성 완료 → {readme_path}")
 
 
 # =============================
@@ -201,14 +219,21 @@ def main():
         console.print(f"  [cyan]{i}[/cyan]. {name}")
     console.print("  [cyan]a[/cyan]. 전체 처리")
 
-    choice = console.input("\n👉 선택: ").strip().lower()
+    choice = console.input("\n👉 ZIP 선택: ").strip().lower()
+
+    console.print("\n📄 출력 방식 선택")
+    console.print("  [1] 이미지별 .md 파일")
+    console.print("  [2] 하나의 README.md 로 합치기")
+    mode = console.input("👉 선택: ").strip()
+
+    merge_mode = mode == "2"
 
     model_id = get_model_id()
-    console.print(f"\n✅ 사용 중인 모델: [bold]{model_id}[/bold]")
+    console.print(f"\n✅ 사용 중인 모델: [bold]{model_id}[/bold]\n")
 
     if choice == "a":
         for z in zip_files:
-            process_zip(os.path.join(DATA_DIR, z), model_id)
+            process_zip(os.path.join(DATA_DIR, z), model_id, merge_mode)
     else:
         if not choice.isdigit():
             console.print("[red]❌ 잘못된 입력[/red]")
@@ -219,7 +244,7 @@ def main():
             console.print("[red]❌ 잘못된 번호[/red]")
             return
 
-        process_zip(os.path.join(DATA_DIR, zip_files[idx]), model_id)
+        process_zip(os.path.join(DATA_DIR, zip_files[idx]), model_id, merge_mode)
 
 
 if __name__ == "__main__":

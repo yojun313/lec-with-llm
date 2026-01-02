@@ -126,12 +126,15 @@ def export_pdf(md_path: str, output_pdf: str, resource_dir: str):
         "pandoc",
         md_path,
         "-o", output_pdf,
+
         "--pdf-engine=wkhtmltopdf",
+        "--pdf-engine-opt=--enable-local-file-access",
+
         "--resource-path", resource_dir,
-        "--enable-local-file-access",
         "--metadata", "pagetitle=",
     ]
     subprocess.run(cmd, check=True)
+
 
 # =============================
 # Process ZIP
@@ -163,10 +166,30 @@ def process_zip(zip_path: str, model_id: str, merge_mode: bool, export_pdf_flag:
             z.extractall(tmp)
 
         images = []
+        seen = set()
+
         for root, _, files in os.walk(tmp):
+            # macOS 메타 폴더 제거
+            if "__MACOSX" in root:
+                continue
+
             for f in sorted(files):
-                if f.lower().endswith(IMAGE_EXTS):
-                    images.append(os.path.join(root, f))
+                # AppleDouble 제거
+                if f.startswith("._"):
+                    continue
+
+                # 확장자 검사
+                if not f.lower().endswith(IMAGE_EXTS):
+                    continue
+
+                full_path = os.path.join(root, f)
+
+                rel = os.path.relpath(full_path, tmp)
+                if rel in seen:
+                    continue
+                seen.add(rel)
+
+                images.append(full_path)
 
         if not images:
             console.print("[yellow]No images found in the ZIP.[/yellow]")

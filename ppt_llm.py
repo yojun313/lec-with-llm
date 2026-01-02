@@ -96,22 +96,22 @@ def describe_image(model_id: str, image_path: str) -> str:
                     {
                         "type": "text",
                         "text": f"""
-이 이미지는 전공 PPT 슬라이드 한 장이다.
+                            이 이미지는 전공 PPT 슬라이드 한 장이다.
 
-이 슬라이드를 분석하여 Markdown 문서에 들어갈 설명을 작성하라.
+                            이 슬라이드를 분석하여 Markdown 문서에 들어갈 설명을 작성하라.
 
-출력 규칙:
-- 반드시 Markdown 형식
-- 제목은 "## {filename}" 형식
-- 한국어
-- 인사말, 메타 설명, 이모티콘 금지
-- 코드 블록 금지
+                            출력 규칙:
+                            - 반드시 Markdown 형식
+                            - 제목은 "## {filename}" 형식
+                            - 한국어
+                            - 인사말, 메타 설명, 이모티콘 금지
+                            - 코드 블록 금지
 
-포함할 내용:
-- 슬라이드 주제
-- 그림 / 도표 설명
-- 전공 관점에서의 설명
-""".strip()
+                            포함할 내용:
+                            - 슬라이드 주제
+                            - 그림 / 도표 설명
+                            - 전공 관점에서의 매우 자세한 설명
+                        """.strip()
                     },
                     {
                         "type": "image_url",
@@ -291,15 +291,17 @@ def main():
     choice = console.input("\nSelect file(s): ").strip().lower()
 
     console.print("\nOutput format:")
-    console.print("  [1] One .md per image")
-    console.print("  [2] Merge into one markdown")
-    mode = console.input("Select: ").strip()
+    console.print("  [1] Merge into one markdown (default)")
+    console.print("  [2] One .md per image")
+    mode = console.input("Select [1]: ").strip()
 
-    merge_mode = mode == "2"
+    # default = 1
+    merge_mode = (mode == "" or mode == "1")
 
     export_pdf_flag = False
     if merge_mode:
-        export_pdf_flag = console.input("Export PDF as well? (y/n) [n]: ").strip().lower() == "y"
+        pdf_choice = console.input("Export PDF as well? (Y/n): ").strip().lower()
+        export_pdf_flag = (pdf_choice == "" or pdf_choice == "y")
 
     model_id = get_model_id()
     console.print(f"\nUsing model: [bold]{model_id}[/bold]\n")
@@ -313,7 +315,6 @@ def main():
             merge_mode,
             export_pdf_flag,
         )
-
-
+    
 if __name__ == "__main__":
     main()

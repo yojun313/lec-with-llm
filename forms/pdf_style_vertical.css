@@ -1,0 +1,58 @@
+/* =========================
+   PAGE SETUP (VERTICAL)
+========================= */
+@page {
+  size: A4 portrait;
+  margin: 40px;
+}
+
+/* =========================
+   BASE TEXT
+========================= */
+body {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont,
+               "Apple SD Gothic Neo", "Noto Sans KR",
+               "Malgun Gothic", sans-serif;
+  line-height: 1.6;
+  font-size: 12pt;
+  color: #111;
+}
+
+/* =========================
+   HEADINGS
+========================= */
+h1, h2, h3 {
+  font-weight: 700;
+}
+
+h2 {
+  page-break-before: always;
+  margin-top: 0;
+  margin-bottom: 0.6em;
+}
+
+/* =========================
+   PARAGRAPHS
+========================= */
+p {
+  margin: 0.6em 0;
+}
+
+/* =========================
+   IMAGES
+========================= */
+img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 16px auto;
+}
+
+/* =========================
+   HR
+========================= */
+hr {
+  margin: 2em 0;
+  border: none;
+  border-top: 1px solid #ccc;
+}

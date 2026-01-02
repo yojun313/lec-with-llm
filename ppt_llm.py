@@ -10,6 +10,7 @@ from dotenv import load_dotenv
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn, TimeElapsedColumn
 from rich.panel import Panel
+import pdfkit
 
 # =============================
 # Environment
@@ -164,23 +165,51 @@ def collect_images(input_path: str, tmp_dir: str) -> list[str]:
 # =============================
 # Markdown → PDF
 # =============================
-def export_pdf(md_path: str, output_pdf: str):
-    html_path = md_path.replace(".md", ".html")
+def export_pdf_both(md_path: str, output_dir: str, base_name: str):
+    # output paths
+    html_path = os.path.join(output_dir, f"{base_name}.html")
 
-    css_path = os.path.join(os.path.dirname(__file__), "pdf_style.css")
+    vertical_pdf = os.path.join(output_dir, f"{base_name}_vertical.pdf")
+    horizontal_pdf = os.path.join(output_dir, f"{base_name}_horizontal.pdf")
 
+    css_vertical = os.path.join(os.path.dirname(__file__), "forms", "pdf_style_vertical.css")
+    css_horizontal = os.path.join(os.path.dirname(__file__), "forms", "pdf_style_horizontal.css")
+
+    title = base_name
+
+    # Markdown → HTML (title 포함)
     subprocess.run(
-        ["pandoc", md_path, "-o", html_path, "--standalone", "--css", css_path],
+        [
+            "pandoc",
+            md_path,
+            "-o", html_path,
+            "--standalone",
+            "--metadata", f"pagetitle={title}",
+        ],
         check=True,
     )
 
-    import pdfkit
+    # Vertical layout PDF
     pdfkit.from_file(
         html_path,
-        output_pdf,
-        options={"enable-local-file-access": None, "quiet": ""},
+        vertical_pdf,
+        options={
+            "enable-local-file-access": None,
+            "user-style-sheet": css_vertical,
+            "quiet": "",
+        },
     )
 
+    # Horizontal layout PDF
+    pdfkit.from_file(
+        html_path,
+        horizontal_pdf,
+        options={
+            "enable-local-file-access": None,
+            "user-style-sheet": css_horizontal,
+            "quiet": "",
+        },
+    )
 
 # =============================
 # Main processing
@@ -259,10 +288,14 @@ def process_input_file(input_path: str, model_id: str, merge_mode: bool, export_
         md_fp.close()
 
         if export_pdf_flag:
-            pdf_path = os.path.join(output_dir, f"{base_name}.pdf")
-            export_pdf(merged_md_path, pdf_path)
-            console.print(f"[green]PDF generated:[/green] {pdf_path}")
-
+            export_pdf_both(
+                merged_md_path,
+                output_dir,
+                base_name
+            )
+            console.print(f"[green]PDF generated:[/green]")
+            console.print(f" - {base_name}_vertical.pdf")
+            console.print(f" - {base_name}_horizontal.pdf")
 
 # =============================
 # CLI

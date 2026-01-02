@@ -10,6 +10,7 @@ from dotenv import load_dotenv
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn, TimeElapsedColumn
 from rich.panel import Panel
+import pdfkit
 
 # =============================
 # Environment

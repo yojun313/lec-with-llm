@@ -3,7 +3,7 @@ import gc
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn, TimeElapsedColumn
 from rich.panel import Panel
-from rich.prompt import IntPrompt
+from rich.prompt import IntPrompt, Prompt
 from faster_whisper import WhisperModel
 
 # ======================
@@ -93,7 +93,7 @@ def format_with_timestamps(segments):
 # ======================
 # 메인 처리
 # ======================
-def transcribe_folder(folder: str, model_level: int):
+def transcribe_folder(folder: str, model_level: int, language: str):
     if not os.path.isdir(folder):
         console.print(f"[red]audio_data 폴더가 없습니다:[/] {folder}")
         return
@@ -109,11 +109,14 @@ def transcribe_folder(folder: str, model_level: int):
 
     model = get_whisper_model(model_level)
 
+    lang_label = "자동 감지" if language == "auto" else language
+
     console.print(Panel.fit(
         f"입력 폴더: audio_data\n"
         f"출력 폴더: audio_result\n"
         f"파일 수: {len(mp3_files)}\n"
-        f"모델: {WHISPER_MODEL_MAP[model_level]['name']}",
+        f"모델: {WHISPER_MODEL_MAP[model_level]['name']}\n"
+        f"언어: {lang_label}",
         title="Whisper Batch",
         border_style="cyan"
     ))
@@ -140,7 +143,7 @@ def transcribe_folder(folder: str, model_level: int):
 
             segments, info = model.transcribe(
                 audio_path,
-                language="ko",
+                language=None if language == "auto" else language,
                 beam_size=1 if model_level < 3 else 5,
                 vad_filter=True,
             )
@@ -171,7 +174,12 @@ def main():
         default=2,
     )
 
-    transcribe_folder(AUDIO_DIR, model_level)
+    language = Prompt.ask(
+        "언어 코드 입력 (auto / ko / en / ja ...)",
+        default="auto",
+    )
+
+    transcribe_folder(AUDIO_DIR, model_level, language)
 
 
 if __name__ == "__main__":

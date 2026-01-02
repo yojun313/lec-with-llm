@@ -84,7 +84,7 @@ To enable Markdown → PDF conversion:
 sudo apt install pandoc texlive-xetex fonts-noto-cjk
 ```
 
-If you do not want LaTeX, you may alternatively install:
+(Recommended) If you do not want LaTeX, you may alternatively install:
 
 ```bash
 sudo apt install wkhtmltopdf fonts-noto-cjk

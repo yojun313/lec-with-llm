@@ -122,18 +122,15 @@ def md_image_path_in_images_dir(filename: str) -> str:
 # Markdown -> PDF (Pandoc)
 # =============================
 def export_pdf(md_path: str, output_pdf: str, resource_dir: str):
-    # Requires: pandoc + (recommended) xelatex
     cmd = [
         "pandoc",
         md_path,
         "-o", output_pdf,
-        "--pdf-engine=xelatex",
+        "--pdf-engine=wkhtmltopdf",
         "--resource-path", resource_dir,
-        "-V", "mainfont=Noto Sans",
-        "-V", "CJKmainfont=Noto Sans CJK KR",
+        "--metadata", "pagetitle= ",
     ]
     subprocess.run(cmd, check=True)
-
 
 # =============================
 # Process ZIP

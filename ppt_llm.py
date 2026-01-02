@@ -170,12 +170,14 @@ def export_pdf(md_path: str, output_pdf: str, layout: str = "vertical"):
     forms_dir = os.path.join(os.path.dirname(__file__), "forms")
     css_file = "pdf_style_vertical.css" if layout == "vertical" else "pdf_style_landscape.css"
     css_path = os.path.join(forms_dir, css_file)
+    title = os.path.splitext(os.path.basename(md_path))[0]
 
     subprocess.run(
         [
             "pandoc",
             md_path,
             "-f", "markdown+fenced_divs",
+            "--metadata", f"pagetitle={title}",
             "-o", html_path,
             "--standalone",
             "--css", css_path,
@@ -193,6 +195,11 @@ def export_pdf(md_path: str, output_pdf: str, layout: str = "vertical"):
 
     import pdfkit
     pdfkit.from_file(html_path, output_pdf, options=options)
+    
+    try:
+        os.remove(html_path)
+    except OSError:
+        pass
 
 # =============================
 # Main processing
@@ -291,14 +298,19 @@ def process_input_file(input_path: str, model_id: str, merge_mode: bool, export_
 
         if export_pdf_flag:
             # 세로 PDF
-            pdf_path_vertical = os.path.join(output_dir, f"{base_name}.pdf")
+            pdf_path_vertical = os.path.join(output_dir, f"{base_name}_v.pdf")
             export_pdf(merged_md_path, pdf_path_vertical, layout="vertical")
             console.print(f"[green]PDF generated:[/green] {pdf_path_vertical}")
 
             # 가로(좌/우) PDF
-            pdf_path_landscape = os.path.join(output_dir, f"{base_name}_landscape.pdf")
+            pdf_path_landscape = os.path.join(output_dir, f"{base_name}_h.pdf")
             export_pdf(merged_md_landscape_path, pdf_path_landscape, layout="landscape")
             console.print(f"[green]PDF generated:[/green] {pdf_path_landscape}")
+            
+            try:
+                os.remove(merged_md_landscape_path)
+            except OSError:
+                pass
 
 
 

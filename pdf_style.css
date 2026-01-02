@@ -1,0 +1,26 @@
+/* 전체 페이지 기본 설정 */
+body {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo",
+               "Noto Sans KR", "Malgun Gothic", sans-serif;
+  line-height: 1.6;
+  margin: 40px;
+}
+
+/* 이미지 크기 제한 */
+img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 16px auto;
+}
+
+/* 페이지 분리 안정화 */
+h2 {
+  page-break-before: always;
+  margin-top: 0;
+}
+
+/* 문단 간격 */
+p {
+  margin: 0.6em 0;
+}

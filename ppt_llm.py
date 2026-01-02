@@ -122,15 +122,11 @@ def md_image_path_in_images_dir(filename: str) -> str:
 # =============================
 # Markdown -> PDF (Pandoc)
 # =============================
-def export_pdf(md_path: str, output_pdf: str, resource_dir: str):
-    """
-    Convert markdown -> HTML (pandoc)
-    then HTML -> PDF (pdfkit / wkhtmltopdf)
-    """
-
+def export_pdf(md_path: str, output_pdf: str):
     html_path = md_path.replace(".md", ".html")
 
-    # 1) Markdown → HTML
+    css_path = os.path.join(os.path.dirname(__file__), "pdf_style.css")
+
     subprocess.run(
         [
             "pandoc",
@@ -138,21 +134,21 @@ def export_pdf(md_path: str, output_pdf: str, resource_dir: str):
             "-o",
             html_path,
             "--standalone",
+            "--css", css_path,
         ],
         check=True,
     )
 
-    # 2) HTML → PDF (wkhtmltopdf via pdfkit)
-    options = {
-        "enable-local-file-access": None,
-        "quiet": "",
-    }
-
+    import pdfkit
     pdfkit.from_file(
         html_path,
         output_pdf,
-        options=options,
+        options={
+            "enable-local-file-access": None,
+            "quiet": "",
+        },
     )
+
 
 # =============================
 # Process ZIP

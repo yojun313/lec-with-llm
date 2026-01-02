@@ -23,7 +23,7 @@ HEADERS = {
 }
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-DATA_DIR = os.path.join(SCRIPT_DIR, "ppt_data")
+DATA_DIR = os.path.join(SCRIPT_DIR, "ppt_daat")
 RESULT_DIR = os.path.join(SCRIPT_DIR, "ppt_result")
 
 IMAGE_EXTS = (".png", ".jpg", ".jpeg")

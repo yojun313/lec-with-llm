@@ -1,123 +1,56 @@
 import os
+import json
 import gc
+import requests
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn, TimeElapsedColumn
 from rich.panel import Panel
 from rich.prompt import IntPrompt, Prompt
-from faster_whisper import WhisperModel
+from dotenv import load_dotenv
 
-# ======================
-# 환경 설정
-# ======================
-os.environ["TRANSFORMERS_VERBOSITY"] = "error"
-os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
-os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
+load_dotenv()
 
 console = Console()
 
+# ======================
+# Paths
+# ======================
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 AUDIO_DIR = os.path.join(BASE_DIR, "audio_data")
 RESULT_DIR = os.path.join(BASE_DIR, "audio_result")
-MODEL_DIR = os.getenv("MODEL_PATH", os.path.join(BASE_DIR, "models"))
-
 os.makedirs(RESULT_DIR, exist_ok=True)
 
-WHISPER_MODEL_MAP = {
-    1: {"name": "faster-whisper-small", "compute": "int8_float16"},
-    2: {"name": "faster-whisper-medium", "compute": "int8_float16"},
-    3: {"name": "faster-whisper-large-v3", "compute": "float16"},
-}
+# ======================
+# Server config
+# ======================
+API_URL = os.getenv("AUDIO_LLM_URL", "").rstrip("/") + "/whisper"
+TOKEN = os.getenv("TOKEN", "EMPTY")
 
-_whisper_models = {}
+HEADERS = {}
+if TOKEN and TOKEN != "EMPTY":
+    HEADERS["Authorization"] = f"Bearer {TOKEN}"
 
 # ======================
-# Whisper 모델 로딩
-# ======================
-def get_whisper_model(level: int):
-    if level not in WHISPER_MODEL_MAP:
-        level = 2
-
-    cfg = WHISPER_MODEL_MAP[level]
-    key = f"{cfg['name']}::{cfg['compute']}"
-
-    if key not in _whisper_models:
-        console.print(f"[cyan]모델 로딩:[/] {cfg['name']} ({cfg['compute']})")
-        _whisper_models[key] = WhisperModel(
-            os.path.join(MODEL_DIR, cfg["name"]),
-            device="cuda",
-            compute_type=cfg["compute"],
-            local_files_only=True,
-        )
-
-    return _whisper_models[key]
-
-
-# ======================
-# 텍스트 포맷
-# ======================
-def format_paragraphs(segments, max_len=120):
-    paragraphs = []
-    buf = ""
-
-    for seg in segments:
-        text = seg.text.strip()
-        if not text:
-            continue
-
-        if len(buf) + len(text) <= max_len:
-            buf += " " + text
-        else:
-            paragraphs.append(buf.strip())
-            buf = text
-
-    if buf:
-        paragraphs.append(buf.strip())
-
-    return "\n\n".join(paragraphs)
-
-
-def format_with_timestamps(segments):
-    def ts(t):
-        h = int(t // 3600)
-        m = int((t % 3600) // 60)
-        s = int(t % 60)
-        ms = int((t - int(t)) * 1000)
-        return f"{h:02}:{m:02}:{s:02},{ms:03}"
-
-    return "\n".join(
-        f"[{ts(seg.start)} - {ts(seg.end)}] {seg.text.strip()}"
-        for seg in segments
-    )
-
-
-# ======================
-# 메인 처리
+# Main processing
 # ======================
 def transcribe_folder(folder: str, model_level: int, language: str):
     if not os.path.isdir(folder):
-        console.print(f"[red]audio_data 폴더가 없습니다:[/] {folder}")
+        console.print(f"[red]audio_data folder not found:[/] {folder}")
         return
 
-    mp3_files = sorted(
-        f for f in os.listdir(folder)
-        if f.lower().endswith(".mp3")
-    )
+    mp3_files = sorted(f for f in os.listdir(folder) if f.lower().endswith(".mp3"))
 
     if not mp3_files:
-        console.print("[yellow]audio_data 안에 mp3 파일이 없습니다.[/]")
+        console.print("[yellow]No mp3 files found in audio_data[/]")
         return
 
-    model = get_whisper_model(model_level)
-
-    lang_label = "자동 감지" if language == "auto" else language
-
     console.print(Panel.fit(
-        f"입력 폴더: audio_data\n"
-        f"출력 폴더: audio_result\n"
-        f"파일 수: {len(mp3_files)}\n"
-        f"모델: {WHISPER_MODEL_MAP[model_level]['name']}\n"
-        f"언어: {lang_label}",
-        title="Whisper Batch",
+        f"Input folder: audio_data\n"
+        f"Output folder: audio_result\n"
+        f"Files: {len(mp3_files)}\n"
+        f"Model level: {model_level}\n"
+        f"Language: {language}",
+        title="Whisper API Client",
         border_style="cyan"
     ))
 
@@ -130,35 +63,55 @@ def transcribe_folder(folder: str, model_level: int, language: str):
         console=console,
     ) as progress:
 
-        task = progress.add_task("음성 변환 중...", total=len(mp3_files))
+        task = progress.add_task("Transcribing...", total=len(mp3_files))
 
         for fname in mp3_files:
             audio_path = os.path.join(folder, fname)
             base = os.path.splitext(fname)[0]
 
-            out_txt = os.path.join(RESULT_DIR, f"{base}.txt")
-            out_ts = os.path.join(RESULT_DIR, f"{base}_with_time.txt")
+            out_txt = os.path.join(RESULT_DIR, f"{base}_text.txt")
+            out_ts = os.path.join(RESULT_DIR, f"{base}_text_with_time.txt")
 
-            console.log(f"🎧 처리 중: {fname}")
+            console.log(f"Uploading: {fname}")
 
-            segments, info = model.transcribe(
-                audio_path,
-                language=None if language == "auto" else language,
-                beam_size=1 if model_level < 3 else 5,
-                vad_filter=True,
-            )
+            with open(audio_path, "rb") as f:
+                files = {
+                    "file": (fname, f, "audio/mpeg")
+                }
 
-            segments = list(segments)
+                payload = {
+                    "option": json.dumps({
+                        "language": language,
+                        "model": model_level,
+                        "pid": None
+                    })
+                }
+
+                response = requests.post(
+                    API_URL,
+                    headers=HEADERS,
+                    files=files,
+                    data=payload,
+                    timeout=60 * 60,
+                )
+
+            if response.status_code != 200:
+                console.print(f"[red]Failed: {fname} ({response.status_code})[/]")
+                console.print(response.text)
+                progress.advance(task)
+                continue
+
+            result = response.json()
 
             with open(out_txt, "w", encoding="utf-8") as f:
-                f.write(format_paragraphs(segments))
+                f.write(result.get("text", ""))
 
             with open(out_ts, "w", encoding="utf-8") as f:
-                f.write(format_with_timestamps(segments))
+                f.write(result.get("text_with_time", ""))
 
             progress.advance(task)
 
-    console.print("\n[bold green]✅ 모든 파일 처리 완료[/]")
+    console.print("\n[bold green]All audio files processed successfully.[/]")
     gc.collect()
 
 
@@ -166,16 +119,16 @@ def transcribe_folder(folder: str, model_level: int, language: str):
 # Entry
 # ======================
 def main():
-    console.print(Panel.fit("Whisper Batch Transcriber", style="bold cyan"))
+    console.print(Panel.fit("Whisper API Client", style="bold cyan"))
 
     model_level = IntPrompt.ask(
-        "모델 선택 (1=small, 2=medium, 3=large)",
+        "Model level (1=small, 2=medium, 3=large)",
         choices=["1", "2", "3"],
         default=2,
     )
 
     language = Prompt.ask(
-        "언어 코드 입력 (auto / ko / en / ja ...)",
+        "Language code (auto / ko / en / ja ...)",
         default="auto",
     )
 

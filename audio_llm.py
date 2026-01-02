@@ -31,25 +31,18 @@ if TOKEN and TOKEN != "EMPTY":
     HEADERS["Authorization"] = f"Bearer {TOKEN}"
 
 # ======================
-# Main processing
+# Core logic
 # ======================
-def transcribe_folder(folder: str, model_level: int, language: str):
-    if not os.path.isdir(folder):
-        console.print(f"[red]audio_data folder not found:[/] {folder}")
-        return
-
-    mp3_files = sorted(f for f in os.listdir(folder) if f.lower().endswith(".mp3"))
-
-    if not mp3_files:
-        console.print("[yellow]No mp3 files found in audio_data[/]")
+def transcribe_files(files: list[str], model_level: int, language: str, save_mode: str):
+    if not files:
+        console.print("[yellow]No audio files selected.[/]")
         return
 
     console.print(Panel.fit(
-        f"Input folder: audio_data\n"
-        f"Output folder: audio_result\n"
-        f"Files: {len(mp3_files)}\n"
+        f"Files: {len(files)}\n"
         f"Model level: {model_level}\n"
-        f"Language: {language}",
+        f"Language: {language}\n"
+        f"Output: {'text only' if save_mode == 'text' else 'text with timestamps'}",
         title="Whisper API Client",
         border_style="cyan"
     ))
@@ -63,19 +56,21 @@ def transcribe_folder(folder: str, model_level: int, language: str):
         console=console,
     ) as progress:
 
-        task = progress.add_task("Transcribing...", total=len(mp3_files))
+        task = progress.add_task("Transcribing...", total=len(files))
 
-        for fname in mp3_files:
-            audio_path = os.path.join(folder, fname)
+        for fname in files:
+            audio_path = os.path.join(AUDIO_DIR, fname)
             base = os.path.splitext(fname)[0]
 
-            out_txt = os.path.join(RESULT_DIR, f"{base}_text.txt")
-            out_ts = os.path.join(RESULT_DIR, f"{base}_text_with_time.txt")
+            if save_mode == "text":
+                output_path = os.path.join(RESULT_DIR, f"{base}.txt")
+            else:
+                output_path = os.path.join(RESULT_DIR, f"{base}_with_time.txt")
 
             console.log(f"Uploading: {fname}")
 
             with open(audio_path, "rb") as f:
-                files = {
+                files_payload = {
                     "file": (fname, f, "audio/mpeg")
                 }
 
@@ -90,7 +85,7 @@ def transcribe_folder(folder: str, model_level: int, language: str):
                 response = requests.post(
                     API_URL,
                     headers=HEADERS,
-                    files=files,
+                    files=files_payload,
                     data=payload,
                     timeout=60 * 60,
                 )
@@ -103,15 +98,18 @@ def transcribe_folder(folder: str, model_level: int, language: str):
 
             result = response.json()
 
-            with open(out_txt, "w", encoding="utf-8") as f:
-                f.write(result.get("text", ""))
+            content = (
+                result.get("text", "")
+                if save_mode == "text"
+                else result.get("text_with_time", "")
+            )
 
-            with open(out_ts, "w", encoding="utf-8") as f:
-                f.write(result.get("text_with_time", ""))
+            with open(output_path, "w", encoding="utf-8") as f:
+                f.write(content)
 
             progress.advance(task)
 
-    console.print("\n[bold green]All audio files processed successfully.[/]")
+    console.print("\n[bold green]All selected files processed successfully.[/]")
     gc.collect()
 
 
@@ -121,6 +119,39 @@ def transcribe_folder(folder: str, model_level: int, language: str):
 def main():
     console.print(Panel.fit("Whisper API Client", style="bold cyan"))
 
+    if not os.path.isdir(AUDIO_DIR):
+        console.print("[red]audio_data folder not found.[/red]")
+        return
+
+    mp3_files = sorted(f for f in os.listdir(AUDIO_DIR) if f.lower().endswith(".mp3"))
+
+    if not mp3_files:
+        console.print("[red]No mp3 files found in audio_data.[/red]")
+        return
+
+    # 파일 선택 UI
+    console.print("\n[bold cyan]Available audio files[/bold cyan]")
+    for i, name in enumerate(mp3_files, 1):
+        console.print(f"  [cyan]{i}[/cyan]. {name}")
+    console.print("  [cyan]a[/cyan]. Process all")
+
+    choice = console.input("\nSelect file(s): ").strip().lower()
+
+    if choice == "a":
+        selected_files = mp3_files
+    else:
+        if not choice.isdigit():
+            console.print("[red]Invalid selection.[/red]")
+            return
+
+        idx = int(choice) - 1
+        if idx < 0 or idx >= len(mp3_files):
+            console.print("[red]Invalid number.[/red]")
+            return
+
+        selected_files = [mp3_files[idx]]
+
+    # options
     model_level = IntPrompt.ask(
         "Model level (1=small, 2=medium, 3=large)",
         choices=["1", "2", "3"],
@@ -131,8 +162,16 @@ def main():
         "Language code (auto / ko / en / ja ...)",
         default="auto",
     )
+    
+    output_mode = Prompt.ask(
+        "Output format (1 = text only, 2 = text with timestamps)",
+        choices=["1", "2"],
+        default="1"
+    )
 
-    transcribe_folder(AUDIO_DIR, model_level, language)
+    save_mode = "text" if output_mode == "1" else "time"
+
+    transcribe_files(selected_files, model_level, language, save_mode)
 
 
 if __name__ == "__main__":

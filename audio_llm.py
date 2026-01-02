@@ -116,63 +116,120 @@ def transcribe_files(files: list[str], model_level: int, language: str, save_mod
 # ======================
 # Entry
 # ======================
+def clear_audio_result_dir():
+    if not os.path.isdir(RESULT_DIR):
+        console.print("[yellow]Result directory does not exist.[/yellow]")
+        return
+
+    items = os.listdir(RESULT_DIR)
+
+    if not items:
+        console.print("[green]Result directory is already empty.[/green]")
+        return
+
+    console.print("\n[bold red]Files in result directory:[/bold red]")
+    for name in items:
+        console.print(f"  - {name}")
+
+    confirm = console.input("\nDelete ALL files above? (y/N): ").strip().lower()
+    if confirm != "y":
+        console.print("[yellow]Cancelled.[/yellow]")
+        return
+
+    for name in items:
+        path = os.path.join(RESULT_DIR, name)
+        try:
+            if os.path.isdir(path):
+                import shutil
+                shutil.rmtree(path)
+            else:
+                os.remove(path)
+        except Exception as e:
+            console.print(f"[red]Failed to remove {name}: {e}[/red]")
+
+    console.print("[green]Result directory cleared.[/green]")
+
 def main():
     console.print(Panel.fit("Whisper API Client", style="bold cyan"))
 
-    if not os.path.isdir(AUDIO_DIR):
-        console.print("[red]audio_data folder not found.[/red]")
-        return
+    os.makedirs(RESULT_DIR, exist_ok=True)
 
-    mp3_files = sorted(f for f in os.listdir(AUDIO_DIR) if f.lower().endswith(".mp3"))
+    while True:
+        console.print("\n[bold cyan]Main Menu[/bold cyan]")
+        console.print("  [1] Start transcription")
+        console.print("  [2] Clear result directory")
+        console.print("  [q] Quit")
 
-    if not mp3_files:
-        console.print("[red]No mp3 files found in audio_data.[/red]")
-        return
+        menu = console.input("\nSelect: ").strip().lower()
 
-    # 파일 선택 UI
-    console.print("\n[bold cyan]Available audio files[/bold cyan]")
-    for i, name in enumerate(mp3_files, 1):
-        console.print(f"  [cyan]{i}[/cyan]. {name}")
-    console.print("  [cyan]a[/cyan]. Process all")
+        if menu == "q":
+            return
 
-    choice = console.input("\nSelect file(s): ").strip().lower()
+        if menu == "2":
+            clear_audio_result_dir()
+            continue
 
-    if choice == "a":
-        selected_files = mp3_files
-    else:
-        if not choice.isdigit():
+        if menu != "1":
             console.print("[red]Invalid selection.[/red]")
-            return
+            continue
 
-        idx = int(choice) - 1
-        if idx < 0 or idx >= len(mp3_files):
-            console.print("[red]Invalid number.[/red]")
-            return
+        # ===== Start transcription =====
 
-        selected_files = [mp3_files[idx]]
+        if not os.path.isdir(AUDIO_DIR):
+            console.print("[red]audio_data folder not found.[/red]")
+            continue
 
-    # options
-    model_level = IntPrompt.ask(
-        "Model level (1=small, 2=medium, 3=large)",
-        choices=["1", "2", "3"],
-        default=2,
-    )
+        mp3_files = sorted(f for f in os.listdir(AUDIO_DIR) if f.lower().endswith(".mp3"))
 
-    language = Prompt.ask(
-        "Language code (auto / ko / en / ja ...)",
-        default="auto",
-    )
-    
-    output_mode = Prompt.ask(
-        "Output format (1 = text only, 2 = text with timestamps)",
-        choices=["1", "2"],
-        default="1"
-    )
+        if not mp3_files:
+            console.print("[red]No mp3 files found in audio_data.[/red]")
+            continue
 
-    save_mode = "text" if output_mode == "1" else "time"
+        console.print("\n[bold cyan]Available audio files[/bold cyan]")
+        for i, name in enumerate(mp3_files, 1):
+            console.print(f"  [cyan]{i}[/cyan]. {name}")
+        console.print("  [cyan]a[/cyan]. Process all")
 
-    transcribe_files(selected_files, model_level, language, save_mode)
+        choice = console.input("\nSelect file(s): ").strip().lower()
 
+        if choice == "a":
+            selected_files = mp3_files
+        elif choice.isdigit():
+            idx = int(choice) - 1
+            if idx < 0 or idx >= len(mp3_files):
+                console.print("[red]Invalid number.[/red]")
+                continue
+            selected_files = [mp3_files[idx]]
+        else:
+            console.print("[red]Invalid selection.[/red]")
+            continue
+
+        # ===== options =====
+        model_level = IntPrompt.ask(
+            "Model level (1=small, 2=medium, 3=large)",
+            choices=["1", "2", "3"],
+            default=2,
+        )
+
+        language = Prompt.ask(
+            "Language code (auto / ko / en / ja ...)",
+            default="auto",
+        )
+
+        output_mode = Prompt.ask(
+            "Output format (1 = text only, 2 = text with timestamps)",
+            choices=["1", "2"],
+            default="1"
+        )
+
+        save_mode = "text" if output_mode == "1" else "time"
+
+        transcribe_files(
+            selected_files,
+            model_level,
+            language,
+            save_mode,
+        )
 
 if __name__ == "__main__":
     main()

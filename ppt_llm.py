@@ -267,54 +267,118 @@ def process_input_file(input_path: str, model_id: str, merge_mode: bool, export_
 # =============================
 # CLI
 # =============================
-def main():
-    if not os.path.isdir(DATA_DIR):
-        console.print("[red]ppt_data folder not found.[/red]")
+
+def clear_result_dir():
+    if not os.path.isdir(RESULT_DIR):
+        console.print("[yellow]Result directory does not exist.[/yellow]")
         return
 
+    items = os.listdir(RESULT_DIR)
+
+    if not items:
+        console.print("[green]Result directory is already empty.[/green]")
+        return
+
+    console.print("\n[bold red]Files in result directory:[/bold red]")
+    for name in items:
+        console.print(f"  - {name}")
+
+    confirm = console.input("\nDelete ALL files above? (y/N): ").strip().lower()
+    if confirm != "y":
+        console.print("[yellow]Cancelled.[/yellow]")
+        return
+
+    for name in items:
+        path = os.path.join(RESULT_DIR, name)
+        try:
+            if os.path.isdir(path):
+                import shutil
+                shutil.rmtree(path)
+            else:
+                os.remove(path)
+        except Exception as e:
+            console.print(f"[red]Failed to remove {name}: {e}[/red]")
+
+    console.print("[green]Result directory cleared.[/green]")
+
+def main():
     os.makedirs(RESULT_DIR, exist_ok=True)
 
-    input_files = sorted(
-        f for f in os.listdir(DATA_DIR)
-        if f.lower().endswith((".zip", ".pdf"))
-    )
+    while True:
+        console.print("\n[bold cyan]Main Menu[/bold cyan]")
+        console.print("  [1] Start processing")
+        console.print("  [2] Clear result directory")
+        console.print("  [q] Quit")
 
-    if not input_files:
-        console.print("[red]No input files found.[/red]")
-        return
+        choice = console.input("\nSelect: ").strip().lower()
 
-    console.print("\n[bold cyan]Available input files[/bold cyan]")
-    for i, name in enumerate(input_files, 1):
-        console.print(f"  [cyan]{i}[/cyan]. {name}")
-    console.print("  [cyan]a[/cyan]. Process all")
+        if choice == "q":
+            return
 
-    choice = console.input("\nSelect file(s): ").strip().lower()
+        if choice == "2":
+            clear_result_dir()
+            continue
 
-    console.print("\nOutput format:")
-    console.print("  [1] Merge into one markdown (default)")
-    console.print("  [2] One .md per image")
-    mode = console.input("Select [1]: ").strip()
+        if choice != "1":
+            console.print("[red]Invalid selection.[/red]")
+            continue
 
-    # default = 1
-    merge_mode = (mode == "" or mode == "1")
+        # =============================
+        # START PROCESSING
+        # =============================
 
-    export_pdf_flag = False
-    if merge_mode:
-        pdf_choice = console.input("Export PDF as well? (Y/n): ").strip().lower()
-        export_pdf_flag = (pdf_choice == "" or pdf_choice == "y")
+        if not os.path.isdir(DATA_DIR):
+            console.print("[red]ppt_data folder not found.[/red]")
+            return
 
-    model_id = get_model_id()
-    console.print(f"\nUsing model: [bold]{model_id}[/bold]\n")
-
-    targets = input_files if choice == "a" else [input_files[int(choice) - 1]]
-
-    for file in targets:
-        process_input_file(
-            os.path.join(DATA_DIR, file),
-            model_id,
-            merge_mode,
-            export_pdf_flag,
+        input_files = sorted(
+            f for f in os.listdir(DATA_DIR)
+            if f.lower().endswith((".zip", ".pdf"))
         )
-    
+
+        if not input_files:
+            console.print("[red]No input files found.[/red]")
+            continue
+
+        console.print("\n[bold cyan]Available input files[/bold cyan]")
+        for i, name in enumerate(input_files, 1):
+            console.print(f"  [cyan]{i}[/cyan]. {name}")
+        console.print("  [cyan]a[/cyan]. Process all")
+
+        choice = console.input("\nSelect file(s): ").strip().lower()
+
+        if choice != "a" and not choice.isdigit():
+            console.print("[red]Invalid selection.[/red]")
+            continue
+
+        console.print("\nOutput format:")
+        console.print("  [1] Merge into one markdown (default)")
+        console.print("  [2] One .md per image")
+
+        mode = console.input("Select [1]: ").strip()
+        merge_mode = (mode == "" or mode == "1")
+
+        export_pdf_flag = False
+        if merge_mode:
+            pdf_choice = console.input("Export PDF as well? (Y/n): ").strip().lower()
+            export_pdf_flag = (pdf_choice == "" or pdf_choice == "y")
+
+        model_id = get_model_id()
+        console.print(f"\nUsing model: [bold]{model_id}[/bold]\n")
+
+        targets = (
+            input_files
+            if choice == "a"
+            else [input_files[int(choice) - 1]]
+        )
+
+        for file in targets:
+            process_input_file(
+                os.path.join(DATA_DIR, file),
+                model_id,
+                merge_mode,
+                export_pdf_flag,
+            )
+
 if __name__ == "__main__":
     main()

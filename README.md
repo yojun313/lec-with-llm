@@ -1,113 +1,162 @@
-# PPT & Audio Processing Tools for lectures
+# Lecture note & Audio Processing Tools (LLM-based)
 
-This repository provides two command-line tools:
+This repository provides two command-line tools for lecture processing:
 
-1. **PPT Slide Description Generator**
-   Converts slide images inside ZIP files or PDF file into Markdown descriptions and PDF with description.
+1. **Lecture note Slide Description Generator**
 
-2. **Audio Transcription Client**
-   Sends audio files to a Whisper-compatible API and saves transcriptions as text files.
+   - Converts slide images inside ZIP files or PDF files into Markdown descriptions
+   - Optionally exports formatted PDF files (vertical & horizontal layouts)
 
-Both tools communicate with external model servers defined via environment variables.
+2. **Audio Transcription Tool**
+   - Sends audio files to a Whisper-compatible API
+   - Saves transcriptions as text files
+
+Both tools support **OpenAI APIs** or **OpenAI-compatible custom servers**, selectable via environment variables.
 
 ---
 
 ## Requirements
 
-### System
+### System Requirements
 
-- Python 3.9+
-- `pandoc` (required for PDF export)
-- `wkhtmltopdf` (used internally via `pdfkit`)
+- Python **3.9+**
+- `pandoc` (Markdown → HTML)
+- `wkhtmltopdf` (HTML → PDF)
+- `poppler` (PDF → images)
 
-### Python dependencies
+### Install system dependencies
 
-Install required packages:
+#### Ubuntu / Debian
+
+```bash
+sudo apt update
+sudo apt install -y pandoc wkhtmltopdf poppler-utils
+```
+
+#### macOS (Homebrew)
+
+```bash
+brew install pandoc wkhtmltopdf poppler
+```
+
+Make sure `wkhtmltopdf` is available in your PATH:
+
+```bash
+wkhtmltopdf --version
+```
+
+---
+
+## Python Dependencies
+
+Install required Python packages:
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### System package dependencies
+### `requirements.txt`
 
-Install required packages:
-
-```bash
-sudo apt install -y pandoc wkhtmltopdf poppler-utils (linux)
-brew install pandoc wkhtmltopdf poppler (mac)
+```txt
+requests
+python-dotenv
+rich
+pdf2image
+pdfkit
+Pillow
 ```
-
-Make sure `wkhtmltopdf` is installed and available in your PATH.
 
 ---
 
 ## Environment Configuration
 
-Create a `.env` file in the project root:
-
-```env
-PPT_LLM_URL=http://localhost:8000/v1 (Compatible with OpenAI API)
-AUDIO_LLM_URL=http://localhost:8001
-CUSTOM_TOKEN=EMPTY
-```
-
-### Variables
-
-- **PPT_LLM_URL**
-  Base URL of the vision-language model server.
-
-- **AUDIO_LLM_URL**
-  Base URL of the Whisper transcription server.
-
-- **CUSTOM_TOKEN**
-  Authorization CUSTOM_TOKEN if required by the server.
-  Use `EMPTY` if authentication is not needed.
+Create a `.env` file in the project root. (Check .env.example)
 
 ---
 
-## Directory Structure
+### LLM Provider Selection
+
+```env
+LLM_PROVIDER=openai
+```
+
+or
+
+```env
+LLM_PROVIDER=custom
+```
+
+---
+
+## OpenAI Configuration (when `LLM_PROVIDER=openai`)
+
+```env
+OPENAI_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxx
+OPENAI_MODEL=gpt-4o
+```
+
+- `OPENAI_MODEL` examples:
+
+  - `gpt-4o`
+  - `gpt-4o-mini`
+  - `gpt-4.1`
+
+---
+
+## Custom Server Configuration (when `LLM_PROVIDER=custom`)
+
+```env
+PPT_LLM_URL=http://localhost:8000/v1
+CUSTOM_TOKEN=your_custom_token_here
+```
+
+- Server must be **OpenAI-compatible**
+- Must support `/v1/chat/completions`
+- Optionally accept `Authorization: Bearer <token>`
+
+---
+
+## Project Structure
 
 ```
 project/
-├── ppt_processor.py
-├── audio_transcriber.py
+├── ppt_llm.py
+├── audio_llm.py
+├── forms/
+│   ├── pdf_style_vertical.css
+│   └── pdf_style_landscape.css
 ├── ppt_data/
-│   └── *.zip
+│   ├── *.zip
 │   └── *.pdf
 ├── audio_data/
 │   └── *.mp3
 ├── ppt_result/
 ├── audio_result/
-├── pdf_style.css
 ├── .env
+├── requirements.txt
+└── README.md
 ```
 
 ---
 
 # Part 1. PPT Slide Description Tool
 
-This tool processes (ZIP files containing slide images or PDF files) and generates Markdown descriptions.
-Optionally, the Markdown can be converted into a PDF.
+This tool processes slide images (ZIP or PDF) and generates structured Markdown descriptions using an LLM.
 
 ---
 
-## Input Format
+## Input Formats
 
-Each ZIP or PDF file inside `ppt_data/` should contain slide images:
+Supported input types inside `ppt_data/`:
 
-```
-ppt_data/
-└── lecture1.zip
-│   ├── slide01.jpg
-│   ├── slide02.png
-└── lecture1.pdf
-```
+- `.zip` → archive containing slide images
+- `.pdf` → multipage PDF (each page converted to image)
 
 Supported image formats:
 
+- `.png`
 - `.jpg`
 - `.jpeg`
-- `.png`
 
 ---
 
@@ -119,44 +168,60 @@ python ppt_llm.py
 
 ---
 
-## Step 1: Select Input File
+## Step 1: Select Input Files
 
-You will see a list of available input files found in the `ppt_data` directory:
+You will see:
 
 ```
 Available input files
 1. lecture1.zip
 2. lecture2.pdf
-3. slides_week3.zip
 a. Process all
 ```
 
-You can choose one of the following options:
+Options:
 
-- Enter a **number** to process a single file
-  (ZIP or PDF)
-- Enter **`a`** to process all listed files
-
-### Supported input formats
-
-- `.zip` — archive containing slide images
-- `.pdf` — multi-page PDF (each page is automatically converted to an image)
-
-Both formats are processed in the same way:
-each page or image is analyzed and converted into structured Markdown content.
+- Enter a number → process one file
+- Enter `a` → process all files
 
 ---
 
 ## Step 2: Choose Output Mode
 
 ```
-1. One .md file per image
-2. Merge into a single markdown file
+1. Merge into one markdown
+2. One .md per image
 ```
 
-### Option 1 — Per-image Markdown
+### Option 1 — Merge into one Markdown (recommended)
 
-Each slide generates its own `.md` file.
+Creates:
+
+```
+ppt_result/lecture1/
+├── lecture1.md
+├── images/
+│   ├── slide01.png
+│   ├── slide02.png
+```
+
+Markdown layout:
+
+```md
+## slide01.png
+
+![slide01.png](./images/slide01.png)
+
+(description)
+
+---
+```
+
+---
+
+### Option 2 — One Markdown per image
+
+Creates:
 
 ```
 ppt_result/lecture1/
@@ -166,61 +231,60 @@ ppt_result/lecture1/
 
 ---
 
-### Option 2 — Merged Markdown
+## Optional: Export PDF
 
-All slides are merged into a single file:
+When merge mode is selected, you will be prompted:
+
+```
+Export PDF as well? (Y/n)
+```
+
+If enabled, **two PDFs are generated**:
+
+### Output files
 
 ```
 ppt_result/lecture1/
-├── lecture1.md
-├── images/
-│   ├── slide01.jpg
-│   ├── slide02.jpg
+├── lecture1_v.pdf   # vertical layout
+├── lecture1_h.pdf   # horizontal layout
 ```
 
-The markdown layout is:
+### Layout explanation
 
-```md
-## slide01.jpg
+#### Vertical PDF (`*_v.pdf`)
 
-![slide01.jpg](./images/slide01.jpg)
+- Image on top
+- Description below
+- Suitable for reading or printing
 
-(description)
+#### Horizontal PDF (`*_h.pdf`)
+
+- A4 landscape
+- Image on the left
+- Description on the right
+- Ideal for slide review
+
+Layout behavior is controlled via:
+
+```
+forms/pdf_style_vertical.css
+forms/pdf_style_landscape.css
+```
 
 ---
-```
 
----
+## PDF Generation Notes
 
-## Optional: Export PDF
-
-If merge mode is selected, you will be asked:
-
-```
-Export PDF as well? (y/n)
-```
-
-When enabled:
-
-- Markdown → HTML (via pandoc)
-- HTML → PDF (via wkhtmltopdf)
-- Output:
-
-  ```
-  ppt_result/lecture1/lecture1.pdf
-  ```
-
-### Notes
-
-- Images are embedded using local file access.
-- Styling is controlled by `pdf_style.css`.
-- Large images may appear scaled depending on CSS.
+- Markdown → HTML via **pandoc**
+- HTML → PDF via **wkhtmltopdf**
+- Local image access enabled automatically
+- Temporary HTML files are deleted after PDF generation
 
 ---
 
 # Part 2. Audio Transcription Tool
 
-This tool uploads audio files to a Whisper-compatible API and saves transcription results.
+This tool sends audio files to a Whisper-compatible API and saves transcription results.
 
 ---
 
@@ -232,7 +296,7 @@ Place audio files in:
 audio_data/
 ```
 
-Supported format:
+Supported formats:
 
 - `.mp3`
 
@@ -248,22 +312,15 @@ python audio_llm.py
 
 ## Step 1: Select Audio Files
 
-The program lists available files:
-
 ```
 1. lecture1.mp3
 2. lecture2.mp3
 a. Process all
 ```
 
-You can:
-
-- Enter a number to process one file
-- Enter `a` to process all files
-
 ---
 
-## Step 2: Choose Model Level
+## Step 2: Choose Model Size
 
 ```
 1 = small
@@ -271,13 +328,13 @@ You can:
 3 = large
 ```
 
-This value is forwarded to the Whisper API.
+This value is forwarded to the Whisper-compatible server.
 
 ---
 
-## Step 3: Choose Language
+## Step 3: Select Language
 
-Example inputs:
+Examples:
 
 ```
 auto
@@ -288,39 +345,25 @@ ja
 
 ---
 
-## Step 4: Choose Output Format
+## Step 4: Output Format
 
 ```
 1 = text only
 2 = text with timestamps
 ```
 
-### Output behavior
-
-#### Option 1 — Text only
-
-Creates:
-
-```
-audio_result/filename.txt
-```
-
-#### Option 2 — Text with timestamps
-
-Creates:
-
-```
-audio_result/filename_with_time.txt
-```
-
-If the API does not return timestamped text, the tool automatically falls back to plain text.
-
 ---
 
-## Output Example
+## Output Files
+
+### Text only
 
 ```
-audio_result/
-├── lecture1.txt
-├── lecture2_with_time.txt
+audio_result/lecture1.txt
+```
+
+### With timestamps
+
+```
+audio_result/lecture1_with_time.txt
 ```

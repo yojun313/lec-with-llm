@@ -70,7 +70,7 @@ def describe_image(model_id, image_path):
     image_data_url = image_to_data_url(image_path)
 
     prompt = f"""
-이 이미지는 발표용 PPT 슬라이드 한 장이다.
+이 이미지는 전공 PPT 슬라이드 한 장이다.
 
 이 슬라이드를 분석하여 README.md에 들어갈 설명을 작성하라.
 

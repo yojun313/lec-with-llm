@@ -340,13 +340,13 @@ def clear_ppt_result_dir():
 
 
 def main():
-    console.print(Panel.fit("Whisper API Client", style="bold cyan"))
+    console.print(Panel.fit("AI Description Client", style="bold cyan"))
 
     os.makedirs(RESULT_DIR, exist_ok=True)
 
     while True:
         console.print("\n[bold cyan]Main Menu[/bold cyan]")
-        console.print("  [1] Start transcription")
+        console.print("  [1] Start processing")
         console.print("  [2] Clear result directory")
         console.print("  [q] Quit")
 

@@ -24,11 +24,11 @@ os.makedirs(RESULT_DIR, exist_ok=True)
 # Server config
 # ======================
 API_URL = os.getenv("AUDIO_LLM_URL", "")
-TOKEN = os.getenv("TOKEN", "EMPTY")
+CUSTOM_TOKEN = os.getenv("CUSTOM_TOKEN", "EMPTY")
 
 HEADERS = {}
-if TOKEN and TOKEN != "EMPTY":
-    HEADERS["Authorization"] = f"Bearer {TOKEN}"
+if CUSTOM_TOKEN and CUSTOM_TOKEN != "EMPTY":
+    HEADERS["Authorization"] = f"Bearer {CUSTOM_TOKEN}"
 
 # ======================
 # Core logic

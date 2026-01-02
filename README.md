@@ -3,7 +3,7 @@
 This repository provides two command-line tools:
 
 1. **PPT Slide Description Generator**
-   Converts slide images inside ZIP files into Markdown descriptions and optionally exports them as PDF.
+   Converts slide images inside ZIP files or PDF file into Markdown descriptions and PDF with description.
 
 2. **Audio Transcription Client**
    Sends audio files to a Whisper-compatible API and saves transcriptions as text files.
@@ -16,16 +16,16 @@ Both tools communicate with external model servers defined via environment varia
 
 ### System
 
-* Python 3.9+
-* `pandoc` (required for PDF export)
-* `wkhtmltopdf` (used internally via `pdfkit`)
+- Python 3.9+
+- `pandoc` (required for PDF export)
+- `wkhtmltopdf` (used internally via `pdfkit`)
 
 ### Python dependencies
 
 Install required packages:
 
 ```bash
-pip install requests python-dotenv rich pdfkit
+pip install -r requirements.txt
 ```
 
 ### System package dependencies
@@ -33,8 +33,8 @@ pip install requests python-dotenv rich pdfkit
 Install required packages:
 
 ```bash
-apt install wkhtmltopdf poppler-utils (linux)
-brew install wkhtmltopdf poppler (mac)
+sudo apt install -y pandoc wkhtmltopdf poppler-utils (linux)
+brew install pandoc wkhtmltopdf poppler (mac)
 ```
 
 Make sure `wkhtmltopdf` is installed and available in your PATH.
@@ -46,21 +46,21 @@ Make sure `wkhtmltopdf` is installed and available in your PATH.
 Create a `.env` file in the project root:
 
 ```env
-PPT_LLM_URL=http://localhost:8000/v1
+PPT_LLM_URL=http://localhost:8000/v1 (Compatible with OpenAI API)
 AUDIO_LLM_URL=http://localhost:8001
-TOKEN=EMPTY
+CUSTOM_TOKEN=EMPTY
 ```
 
 ### Variables
 
-* **PPT_LLM_URL**
+- **PPT_LLM_URL**
   Base URL of the vision-language model server.
 
-* **AUDIO_LLM_URL**
+- **AUDIO_LLM_URL**
   Base URL of the Whisper transcription server.
 
-* **TOKEN**
-  Authorization token if required by the server.
+- **CUSTOM_TOKEN**
+  Authorization CUSTOM_TOKEN if required by the server.
   Use `EMPTY` if authentication is not needed.
 
 ---
@@ -105,9 +105,9 @@ ppt_data/
 
 Supported image formats:
 
-* `.jpg`
-* `.jpeg`
-* `.png`
+- `.jpg`
+- `.jpeg`
+- `.png`
 
 ---
 
@@ -133,14 +133,14 @@ a. Process all
 
 You can choose one of the following options:
 
-* Enter a **number** to process a single file
+- Enter a **number** to process a single file
   (ZIP or PDF)
-* Enter **`a`** to process all listed files
+- Enter **`a`** to process all listed files
 
 ### Supported input formats
 
-* `.zip` — archive containing slide images
-* `.pdf` — multi-page PDF (each page is automatically converted to an image)
+- `.zip` — archive containing slide images
+- `.pdf` — multi-page PDF (each page is automatically converted to an image)
 
 Both formats are processed in the same way:
 each page or image is analyzed and converted into structured Markdown content.
@@ -182,6 +182,7 @@ The markdown layout is:
 
 ```md
 ## slide01.jpg
+
 ![slide01.jpg](./images/slide01.jpg)
 
 (description)
@@ -201,9 +202,9 @@ Export PDF as well? (y/n)
 
 When enabled:
 
-* Markdown → HTML (via pandoc)
-* HTML → PDF (via wkhtmltopdf)
-* Output:
+- Markdown → HTML (via pandoc)
+- HTML → PDF (via wkhtmltopdf)
+- Output:
 
   ```
   ppt_result/lecture1/lecture1.pdf
@@ -211,9 +212,9 @@ When enabled:
 
 ### Notes
 
-* Images are embedded using local file access.
-* Styling is controlled by `pdf_style.css`.
-* Large images may appear scaled depending on CSS.
+- Images are embedded using local file access.
+- Styling is controlled by `pdf_style.css`.
+- Large images may appear scaled depending on CSS.
 
 ---
 
@@ -233,7 +234,7 @@ audio_data/
 
 Supported format:
 
-* `.mp3`
+- `.mp3`
 
 ---
 
@@ -257,8 +258,8 @@ a. Process all
 
 You can:
 
-* Enter a number to process one file
-* Enter `a` to process all files
+- Enter a number to process one file
+- Enter `a` to process all files
 
 ---
 
@@ -323,4 +324,3 @@ audio_result/
 ├── lecture1.txt
 ├── lecture2_with_time.txt
 ```
-

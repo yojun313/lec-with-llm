@@ -16,11 +16,14 @@ from rich.panel import Panel
 # =============================
 load_dotenv()
 
-BASE_URL = os.getenv("PPT_LLM_URL", "").rstrip("/")
-TOKEN = os.getenv("TOKEN", "EMPTY")
+LLM_PROVIDER = os.getenv("LLM_PROVIDER", "openai").lower()
+
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+CUSTOM_BASE_URL = os.getenv("PPT_LLM_URL", "").rstrip("/")
+CUSTOM_TOKEN = os.getenv("CUSTOM_TOKEN")
 
 HEADERS = {
-    "Authorization": f"Bearer {TOKEN}",
+    "Authorization": f"Bearer {CUSTOM_TOKEN}",
     "Content-Type": "application/json",
 }
 
@@ -38,7 +41,16 @@ console = Console()
 # Model auto-select
 # =============================
 def get_model_id():
-    resp = requests.get(f"{BASE_URL}/models", headers=HEADERS, timeout=10)
+    if LLM_PROVIDER == "openai":
+        # OpenAI는 모델 목록 굳이 안 받아와도 됨
+        return os.getenv("OPENAI_MODEL", "gpt-4o")
+
+    # custom server
+    resp = requests.get(
+        f"{CUSTOM_BASE_URL}/models",
+        headers=get_headers(),
+        timeout=10
+    )
     resp.raise_for_status()
 
     models = resp.json().get("data", [])
@@ -46,6 +58,7 @@ def get_model_id():
         raise RuntimeError("No available models.")
 
     return models[0]["id"]
+
 
 
 # =============================
@@ -84,6 +97,22 @@ def extract_pdf_pages(pdf_path: str, output_dir: str) -> list[str]:
 # =============================
 # LLM call
 # =============================
+
+def get_headers():
+    if LLM_PROVIDER == "openai":
+        if not OPENAI_API_KEY:
+            raise RuntimeError("OPENAI_API_KEY is not set")
+        return {
+            "Authorization": f"Bearer {OPENAI_API_KEY}",
+            "Content-Type": "application/json",
+        }
+
+    return {
+        "Authorization": f"Bearer {CUSTOM_TOKEN}",
+        "Content-Type": "application/json",
+    }
+
+
 def describe_image(model_id: str, image_path: str) -> str:
     filename = os.path.basename(image_path)
 
@@ -126,12 +155,17 @@ def describe_image(model_id: str, image_path: str) -> str:
         "max_tokens": 1600,
     }
 
-    r = requests.post(
-        f"{BASE_URL}/chat/completions",
-        headers=HEADERS,
-        json=payload,
-        timeout=360,
-    )
+    if LLM_PROVIDER == "openai":
+        url = "https://api.openai.com/v1/chat/completions"
+        headers = get_headers()
+    else:
+        if LLM_PROVIDER != "openai" and not CUSTOM_BASE_URL:
+            raise RuntimeError("CUSTOM_BASE_URL is not set")
+        
+        url = f"{CUSTOM_BASE_URL}/chat/completions"
+        headers = get_headers()
+
+    r = requests.post(url, headers=headers, json=payload, timeout=360)
     r.raise_for_status()
     return r.json()["choices"][0]["message"]["content"]
 

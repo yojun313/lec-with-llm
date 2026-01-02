@@ -1,0 +1,6 @@
+requests
+python-dotenv
+rich
+pdf2image
+pdfkit
+Pillow

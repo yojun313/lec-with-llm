@@ -1,57 +1,42 @@
-/* =========================
-   PAGE SETUP (HORIZONTAL)
-========================= */
 @page {
   size: A4 landscape;
   margin: 20mm;
 }
 
-/* =========================
-   BASE TEXT
-========================= */
 body {
   font-family: system-ui, -apple-system, BlinkMacSystemFont,
-               "Apple SD Gothic Neo", "Noto Sans KR",
-               "Malgun Gothic", sans-serif;
-  font-size: 13pt;
-  line-height: 1.55;
-  color: #111;
+               "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+  line-height: 1.6;
 }
 
-/* =========================
-   SLIDE SEPARATION
-========================= */
 h2 {
   page-break-before: always;
-  margin-top: 0;
   margin-bottom: 12px;
-  font-size: 22pt;
 }
 
-/* =========================
-   IMAGE (SLIDE CONTENT)
-========================= */
-img {
-  display: block;
-  max-width: 90%;
-  max-height: 70vh;
-  margin: 12px auto 18px auto;
-  object-fit: contain;
+.slide {
+  display: table;
+  width: 100%;
+  table-layout: fixed;
 }
 
-/* =========================
-   TEXT BLOCK
-========================= */
-p {
-  margin: 0.5em 0;
-  font-size: 12.5pt;
+.slide-img,
+.slide-text {
+  display: table-cell;
+  vertical-align: top;
 }
 
-/* =========================
-   SEPARATOR
-========================= */
-hr {
-  border: none;
-  border-top: 1px solid #ccc;
-  margin: 1.5em 0;
+.slide-img {
+  width: 50%;
+  padding-right: 16px;
+}
+
+.slide-img img {
+  max-width: 100%;
+  height: auto;
+}
+
+.slide-text {
+  width: 50%;
+  font-size: 14px;
 }

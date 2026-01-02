@@ -9,6 +9,7 @@ from dotenv import load_dotenv
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn, TimeElapsedColumn
 from rich.panel import Panel
+import pdfkit
 
 # =============================
 # Environment
@@ -122,19 +123,36 @@ def md_image_path_in_images_dir(filename: str) -> str:
 # Markdown -> PDF (Pandoc)
 # =============================
 def export_pdf(md_path: str, output_pdf: str, resource_dir: str):
-    cmd = [
-        "pandoc",
-        md_path,
-        "-o", output_pdf,
+    """
+    Convert markdown -> HTML (pandoc)
+    then HTML -> PDF (pdfkit / wkhtmltopdf)
+    """
 
-        "--pdf-engine=wkhtmltopdf",
-        "--pdf-engine-opt=--enable-local-file-access",
+    html_path = md_path.replace(".md", ".html")
 
-        "--resource-path", resource_dir,
-        "--metadata", "pagetitle=",
-    ]
-    subprocess.run(cmd, check=True)
+    # 1) Markdown → HTML
+    subprocess.run(
+        [
+            "pandoc",
+            md_path,
+            "-o",
+            html_path,
+            "--standalone",
+        ],
+        check=True,
+    )
 
+    # 2) HTML → PDF (wkhtmltopdf via pdfkit)
+    options = {
+        "enable-local-file-access": None,
+        "quiet": "",
+    }
+
+    pdfkit.from_file(
+        html_path,
+        output_pdf,
+        options=options,
+    )
 
 # =============================
 # Process ZIP

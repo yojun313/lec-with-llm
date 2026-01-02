@@ -128,7 +128,8 @@ def export_pdf(md_path: str, output_pdf: str, resource_dir: str):
         "-o", output_pdf,
         "--pdf-engine=wkhtmltopdf",
         "--resource-path", resource_dir,
-        "--metadata", "pagetitle= ",
+        "--enable-local-file-access",
+        "--metadata", "pagetitle=",
     ]
     subprocess.run(cmd, check=True)
 

@@ -11,16 +11,19 @@ Both tools run locally and communicate with external model servers defined via e
 
 ## 1. Directory Structure
 
-Before running the programs, ensure your project directory is structured as follows:
+Ensure your project directory is structured as follows:
 
 ```
 project/
 ├── ppt_llm.py
 ├── audio_llm.py
 ├── .env
-├── data/
-│   ├── (ZIP files or audio folders)
-├── result/
+├── ppt_data/
+│   ├── (ZIP files)
+├── ppt_result/
+├── audio_data/
+│   ├── (audio files)
+├── audio_result/
 └── README.md
 ```
 
@@ -36,44 +39,68 @@ AUDIO_LLM_URL=http://localhost:8000
 TOKEN=EMPTY
 ```
 
-### Environment variables
+### Environment Variables
 
 #### `PPT_LLM_URL`
 
-Endpoint of the vision-language model server used by `ppt_llm.py`.
+Base URL of the vision-language model server used by `ppt_llm.py`.
+
+Example:
+
+```
+http://localhost:8000/v1
+```
 
 #### `AUDIO_LLM_URL`
 
 Base URL of the FastAPI server exposing the `/whisper` endpoint.
 
-Example:
+The client will internally send requests to:
 
 ```
-http://localhost:8000
-```
-
-The script will internally call:
-
-```
-POST {AUDIO_LLM_URL}
+POST {AUDIO_LLM_URL}/whisper
 ```
 
 #### `TOKEN`
 
 Authentication token if required by the server.
-If authentication is not used, set this to `EMPTY`.
+Set to `EMPTY` if authentication is not used.
+
+---
+
+## 3. Required Python Packages
+
+Install dependencies before running the scripts:
+
+```bash
+pip install requests python-dotenv rich
+```
+
+### Optional (for PDF export)
+
+To enable Markdown → PDF conversion:
+
+```bash
+sudo apt install pandoc texlive-xetex
+```
+
+If you do not want LaTeX, you may alternatively install:
+
+```bash
+sudo apt install wkhtmltopdf
+```
 
 ---
 
 # Part I. PPT Slide Description Generator (`ppt_llm.py`)
 
-This tool generates structured textual descriptions from slide images extracted from PowerPoint files.
+This tool generates structured textual explanations from PPT slide images using a vision-language model.
 
 ---
 
-## 3. Input Format (PPT Slides)
+## 4. Input Format (PPT Slides)
 
-Place ZIP files containing slide images inside the `data/` directory.
+Place ZIP files containing extracted slide images into the `data/` directory.
 
 ```
 data/
@@ -88,11 +115,11 @@ data/
 * `.jpg`
 * `.jpeg`
 
-Each ZIP file should contain only image files.
+Each ZIP file must contain only image files.
 
 ---
 
-## 4. Running the PPT Tool
+## 5. Running the PPT Tool
 
 ```bash
 python ppt_llm.py
@@ -107,25 +134,24 @@ Available ZIP files:
 a. Process all
 ```
 
-Select a number to process a specific ZIP file, or choose `a` to process all ZIP files.
+Select a number to process a specific ZIP file, or enter `a` to process all ZIP files.
 
 ---
 
-## 5. Output Format Selection
+## 6. Output Format Selection
 
 After selecting a ZIP file, choose one of the following output modes:
 
 ```
-Output format:
 1. Generate one .md file per image
-2. Merge all results into a single README.md
+2. Merge all results into a single markdown file
 ```
 
 ---
 
-### Option 1: One Markdown File per Image
+## 7. Output Structure
 
-Output structure:
+### Option 1: One Markdown File per Image
 
 ```
 result/lecture1/
@@ -133,58 +159,93 @@ result/lecture1/
 ├── slide02.md
 ```
 
-Each Markdown file contains:
+Each file contains:
 
-* Main topic of the slide
-* Key points
+* Slide topic
+* Key concepts
 * Explanation of diagrams or figures
-* Detailed academic or technical explanation
+* Detailed academic or technical description
 
 ---
 
-### Option 2: Single README.md File
+### Option 2: Merged Markdown File (Recommended)
 
-Output structure:
+When merge mode is selected, output is structured as:
 
 ```
 result/lecture1/
-├── README.md
-├── slide01.jpg
-├── slide02.jpg
+├── lecture1.md
+├── images/
+│   ├── slide01.jpg
+│   ├── slide02.jpg
 ```
 
-Example content:
+### Markdown layout
 
 ```md
+# lecture1
+
 ## slide01.jpg
 
-![slide01.jpg](slide01.jpg)
+![slide01.jpg](./images/slide01.jpg)
 
-Slide description text...
+<generated explanation>
 
 ---
 
 ## slide02.jpg
 
-![slide02.jpg](slide02.jpg)
+![slide02.jpg](./images/slide02.jpg)
 
-Slide description text...
+<generated explanation>
 ```
+
+Images are always copied into the `images/` subdirectory, and Markdown references use relative paths.
+
+---
+
+## 8. Optional PDF Export
+
+If enabled during execution, the merged Markdown file is automatically converted to PDF:
+
+```
+result/lecture1/
+├── lecture1.md
+├── lecture1.pdf
+├── images/
+```
+
+### Requirements for PDF export
+
+One of the following must be installed:
+
+#### Recommended (best quality, supports Korean well)
+
+```bash
+sudo apt install texlive-xetex
+```
+
+#### Alternative
+
+```bash
+sudo apt install wkhtmltopdf
+```
+
+The script automatically calls `pandoc` with the appropriate engine.
 
 ---
 
 # Part II. Audio Transcription Tool (`audio_llm.py`)
 
-This tool uploads audio files to a FastAPI `/whisper` endpoint and saves the returned transcription results.
+This tool uploads audio files to a FastAPI-based Whisper service and saves transcription results locally.
 
-Unlike a local Whisper setup, this script **does not run Whisper directly**.
-Instead, it acts as a client that sends audio files to a server that already hosts the Whisper model.
+The Whisper model runs **on the server**, not in this script.
 
 ---
 
-## 6. Input Audio Directory
+## 9. Input Audio Directory
 
-Place audio files under:
+Place audio files in:
 
 ```
 data/
@@ -199,28 +260,26 @@ data/
 
 ---
 
-## 7. Output Directory
+## 10. Output Directory
 
 Transcription results are written to:
 
 ```
 result/
 └── audio_result/
-    ├── sample1.txt
-    ├── sample1_with_time.txt
-    ├── sample2.txt
-    └── sample2_with_time.txt
+    ├── sample_text.txt
+    ├── sample_text_with_time.txt
 ```
 
-### Output file types
+### Output files
 
-#### `*.txt`
+#### `*_text.txt`
 
 Plain text transcription grouped into readable paragraphs.
 
-#### `*_with_time.txt`
+#### `*_text_with_time.txt`
 
-Transcription with timestamped segments in the format:
+Transcription with timestamps per segment:
 
 ```
 [00:00:01,230 - 00:00:03,840] example sentence
@@ -228,9 +287,7 @@ Transcription with timestamped segments in the format:
 
 ---
 
-## 8. Running the Audio Transcription Tool
-
-Run:
+## 11. Running the Audio Transcription Tool
 
 ```bash
 python audio_llm.py
@@ -252,9 +309,7 @@ This value is forwarded to the API as `model`.
 
 ### 2. Language code
 
-Specify a language code or enable automatic detection.
-
-Examples:
+You may specify a language code or enable automatic detection:
 
 ```
 auto   (automatic detection)
@@ -264,25 +319,20 @@ ja     (Japanese)
 zh     (Chinese)
 ```
 
-The value is passed to the API as the `language` field.
+This value is sent as the `language` field in the request.
 
 ---
 
-## 9. Processing Flow (Audio)
+## 12. Audio Processing Flow
 
 1. Scan `data/audio_data/` for `.mp3` files.
-2. For each file:
+2. Upload each file to `POST /whisper`.
+3. Send transcription options as JSON.
+4. Receive transcription results.
+5. Save:
 
-   * Send a `POST /whisper` request.
-   * Upload audio as multipart form data.
-   * Include transcription options as JSON.
-3. Receive JSON response from the server.
-4. Extract:
-
-   * `text`
-   * `text_with_time`
-5. Save results into `result/audio_result/`.
-6. Display progress using a terminal progress bar.
+   * plain text
+   * timestamped text
+6. Display progress in the terminal.
 
 ---
-

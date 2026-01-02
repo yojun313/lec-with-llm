@@ -131,6 +131,7 @@ def export_pdf(md_path: str, output_pdf: str, resource_dir: str):
         "--pdf-engine=xelatex",
         "--resource-path",
         resource_dir,
+        "-V", "mainfont=Noto Sans CJK KR",
     ]
     subprocess.run(cmd, check=True)
 

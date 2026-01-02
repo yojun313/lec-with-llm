@@ -26,9 +26,15 @@ Install required packages:
 
 ```bash
 pip install requests python-dotenv rich pdfkit
+```
 
-apt install wkhtmltopdf (linux)
-brew install wkhtmltopdf (mac)
+### System package dependencies
+
+Install required packages:
+
+```bash
+apt install wkhtmltopdf poppler-utils (linux)
+brew install wkhtmltopdf poppler (mac)
 ```
 
 Make sure `wkhtmltopdf` is installed and available in your PATH.
@@ -67,6 +73,7 @@ project/
 ├── audio_transcriber.py
 ├── ppt_data/
 │   └── *.zip
+│   └── *.pdf
 ├── audio_data/
 │   └── *.mp3
 ├── ppt_result/
@@ -79,20 +86,21 @@ project/
 
 # Part 1. PPT Slide Description Tool
 
-This tool processes ZIP files containing slide images and generates Markdown descriptions.
+This tool processes (ZIP files containing slide images or PDF files) and generates Markdown descriptions.
 Optionally, the Markdown can be converted into a PDF.
 
 ---
 
 ## Input Format
 
-Each ZIP file inside `ppt_data/` should contain slide images:
+Each ZIP or PDF file inside `ppt_data/` should contain slide images:
 
 ```
 ppt_data/
 └── lecture1.zip
-    ├── slide01.jpg
-    ├── slide02.png
+│   ├── slide01.jpg
+│   ├── slide02.png
+└── lecture1.pdf
 ```
 
 Supported image formats:
@@ -106,26 +114,36 @@ Supported image formats:
 ## Running the Tool
 
 ```bash
-python ppt_processor.py
+python ppt_llm.py
 ```
 
 ---
 
-## Step 1: Select ZIP File
+## Step 1: Select Input File
 
-You will see a list like:
+You will see a list of available input files found in the `ppt_data` directory:
 
 ```
-Available ZIP files
+Available input files
 1. lecture1.zip
-2. lecture2.zip
+2. lecture2.pdf
+3. slides_week3.zip
 a. Process all
 ```
 
-Choose:
+You can choose one of the following options:
 
-* A number → process one ZIP
-* `a` → process all ZIP files
+* Enter a **number** to process a single file
+  (ZIP or PDF)
+* Enter **`a`** to process all listed files
+
+### Supported input formats
+
+* `.zip` — archive containing slide images
+* `.pdf` — multi-page PDF (each page is automatically converted to an image)
+
+Both formats are processed in the same way:
+each page or image is analyzed and converted into structured Markdown content.
 
 ---
 
@@ -222,7 +240,7 @@ Supported format:
 ## Run the Tool
 
 ```bash
-python audio_transcriber.py
+python audio_llm.py
 ```
 
 ---

@@ -5,6 +5,7 @@ import requests
 import base64
 import urllib.parse
 import subprocess
+from pdf2image import convert_from_path
 from dotenv import load_dotenv
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn, TimeElapsedColumn
@@ -28,6 +29,7 @@ DATA_DIR = os.path.join(SCRIPT_DIR, "ppt_data")
 RESULT_DIR = os.path.join(SCRIPT_DIR, "ppt_result")
 
 IMAGE_EXTS = (".png", ".jpg", ".jpeg")
+PDF_EXTS = (".pdf",)
 
 console = Console()
 
@@ -47,7 +49,7 @@ def get_model_id():
 
 
 # =============================
-# Image -> base64 data URL
+# Image → base64
 # =============================
 def image_to_data_url(path: str) -> str:
     with open(path, "rb") as f:
@@ -56,37 +58,34 @@ def image_to_data_url(path: str) -> str:
     encoded = base64.b64encode(raw).decode("utf-8")
 
     ext = os.path.splitext(path)[1].lower()
-    mime = "image/jpeg"
-    if ext == ".png":
-        mime = "image/png"
+    mime = "image/png" if ext == ".png" else "image/jpeg"
 
     return f"data:{mime};base64,{encoded}"
 
 
 # =============================
-# Generate slide description
+# PDF → image pages
+# =============================
+def extract_pdf_pages(pdf_path: str, output_dir: str) -> list[str]:
+    images = convert_from_path(pdf_path, dpi=200)
+
+    paths = []
+    base = os.path.splitext(os.path.basename(pdf_path))[0]
+
+    for i, img in enumerate(images, start=1):
+        name = f"{base}_page_{i:03d}.png"
+        out = os.path.join(output_dir, name)
+        img.save(out, "PNG")
+        paths.append(out)
+
+    return paths
+
+
+# =============================
+# LLM call
 # =============================
 def describe_image(model_id: str, image_path: str) -> str:
     filename = os.path.basename(image_path)
-    image_data_url = image_to_data_url(image_path)
-
-    prompt = f"""
-        이 이미지는 전공 PPT 슬라이드 한 장이다.
-
-        이 슬라이드를 분석하여 Markdown 문서에 들어갈 설명을 작성하라.
-
-        출력 규칙:
-        - 반드시 Markdown 형식으로 작성한다.
-        - 제목은 "## {filename}" 형식으로 시작한다.
-        - 한국어로 작성한다.
-        - 불필요한 인사말, 메타 설명, 이모티콘은 쓰지 않는다.
-        - 코드 블록은 사용하지 않는다.
-
-        설명에는 다음을 포함한다:
-        - 슬라이드의 주제
-        - 도표나 그림의 의미
-        - 전공 PPT에 대한 자세한 설명
-    """.strip()
 
     payload = {
         "model": model_id,
@@ -94,8 +93,32 @@ def describe_image(model_id: str, image_path: str) -> str:
             {
                 "role": "user",
                 "content": [
-                    {"type": "text", "text": prompt},
-                    {"type": "image_url", "image_url": {"url": image_data_url}},
+                    {
+                        "type": "text",
+                        "text": f"""
+이 이미지는 전공 PPT 슬라이드 한 장이다.
+
+이 슬라이드를 분석하여 Markdown 문서에 들어갈 설명을 작성하라.
+
+출력 규칙:
+- 반드시 Markdown 형식
+- 제목은 "## {filename}" 형식
+- 한국어
+- 인사말, 메타 설명, 이모티콘 금지
+- 코드 블록 금지
+
+포함할 내용:
+- 슬라이드 주제
+- 그림 / 도표 설명
+- 전공 관점에서의 설명
+""".strip()
+                    },
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": image_to_data_url(image_path)
+                        }
+                    }
                 ],
             }
         ],
@@ -103,23 +126,43 @@ def describe_image(model_id: str, image_path: str) -> str:
         "max_tokens": 1600,
     }
 
-    resp = requests.post(
+    r = requests.post(
         f"{BASE_URL}/chat/completions",
         headers=HEADERS,
         json=payload,
         timeout=360,
     )
-    resp.raise_for_status()
-    return resp.json()["choices"][0]["message"]["content"]
-
-
-def md_image_path_in_images_dir(filename: str) -> str:
-    # README/markdown is in output_dir; images will be in output_dir/images/
-    return "./images/" + urllib.parse.quote(filename)
+    r.raise_for_status()
+    return r.json()["choices"][0]["message"]["content"]
 
 
 # =============================
-# Markdown -> PDF (Pandoc)
+# Image collection
+# =============================
+def collect_images(input_path: str, tmp_dir: str) -> list[str]:
+    images = []
+
+    if input_path.lower().endswith(".zip"):
+        with zipfile.ZipFile(input_path) as z:
+            z.extractall(tmp_dir)
+
+        for root, _, files in os.walk(tmp_dir):
+            if "__MACOSX" in root:
+                continue
+            for f in files:
+                if f.startswith("._"):
+                    continue
+                if f.lower().endswith(IMAGE_EXTS):
+                    images.append(os.path.join(root, f))
+
+    elif input_path.lower().endswith(".pdf"):
+        images = extract_pdf_pages(input_path, tmp_dir)
+
+    return sorted(images)
+
+
+# =============================
+# Markdown → PDF
 # =============================
 def export_pdf(md_path: str, output_pdf: str):
     html_path = md_path.replace(".md", ".html")
@@ -127,14 +170,7 @@ def export_pdf(md_path: str, output_pdf: str):
     css_path = os.path.join(os.path.dirname(__file__), "pdf_style.css")
 
     subprocess.run(
-        [
-            "pandoc",
-            md_path,
-            "-o",
-            html_path,
-            "--standalone",
-            "--css", css_path,
-        ],
+        ["pandoc", md_path, "-o", html_path, "--standalone", "--css", css_path],
         check=True,
     )
 
@@ -142,72 +178,36 @@ def export_pdf(md_path: str, output_pdf: str):
     pdfkit.from_file(
         html_path,
         output_pdf,
-        options={
-            "enable-local-file-access": None,
-            "quiet": "",
-        },
+        options={"enable-local-file-access": None, "quiet": ""},
     )
 
 
 # =============================
-# Process ZIP
+# Main processing
 # =============================
-def process_zip(zip_path: str, model_id: str, merge_mode: bool, export_pdf_flag: bool):
-    zip_name = os.path.splitext(os.path.basename(zip_path))[0]
-    output_dir = os.path.join(RESULT_DIR, zip_name)
+def process_input_file(input_path: str, model_id: str, merge_mode: bool, export_pdf_flag: bool):
+    base_name = os.path.splitext(os.path.basename(input_path))[0]
+    output_dir = os.path.join(RESULT_DIR, base_name)
     os.makedirs(output_dir, exist_ok=True)
 
     images_dir = os.path.join(output_dir, "images")
     os.makedirs(images_dir, exist_ok=True)
 
-    console.print(
-        Panel.fit(
-            f"Processing ZIP: {zip_name}",
-            title="ZIP",
-        )
-    )
+    console.print(Panel.fit(f"Processing: {base_name}", title="INPUT"))
 
-    # In merge mode, write a single markdown file named after the ppt directory (zip_name)
-    merged_md_path = os.path.join(output_dir, f"{zip_name}.md") if merge_mode else None
+    merged_md_path = os.path.join(output_dir, f"{base_name}.md") if merge_mode else None
+    md_fp = open(merged_md_path, "w", encoding="utf-8") if merge_mode else None
 
     if merge_mode:
-        md_file = open(merged_md_path, "w", encoding="utf-8")
-        md_file.write(f"# {zip_name}\n\n")
+        md_fp.write(f"# {base_name}\n\n")
 
     with tempfile.TemporaryDirectory() as tmp:
-        with zipfile.ZipFile(zip_path, "r") as z:
-            z.extractall(tmp)
-
-        images = []
-        seen = set()
-
-        for root, _, files in os.walk(tmp):
-            # macOS 메타 폴더 제거
-            if "__MACOSX" in root:
-                continue
-
-            for f in sorted(files):
-                # AppleDouble 제거
-                if f.startswith("._"):
-                    continue
-
-                # 확장자 검사
-                if not f.lower().endswith(IMAGE_EXTS):
-                    continue
-
-                full_path = os.path.join(root, f)
-
-                rel = os.path.relpath(full_path, tmp)
-                if rel in seen:
-                    continue
-                seen.add(rel)
-
-                images.append(full_path)
+        images = collect_images(input_path, tmp)
 
         if not images:
-            console.print("[yellow]No images found in the ZIP.[/yellow]")
-            if merge_mode:
-                md_file.close()
+            console.print("[yellow]No images found.[/yellow]")
+            if md_fp:
+                md_fp.close()
             return
 
         with Progress(
@@ -223,59 +223,49 @@ def process_zip(zip_path: str, model_id: str, merge_mode: bool, export_pdf_flag:
 
             for img_path in images:
                 fname = os.path.basename(img_path)
-                md_name = os.path.splitext(fname)[0] + ".md"
-                md_path = os.path.join(output_dir, md_name)
 
                 try:
                     text = describe_image(model_id, img_path)
                 except Exception as e:
-                    progress.console.print(f"[red]Failed:[/red] {fname} -> {e}")
+                    console.print(f"[red]Failed:[/red] {fname} → {e}")
                     progress.advance(task)
                     continue
 
+                # copy image
+                dst_img = os.path.join(images_dir, fname)
+                with open(img_path, "rb") as src, open(dst_img, "wb") as dst:
+                    dst.write(src.read())
+
+                rel_img = "./images/" + urllib.parse.quote(fname)
+
                 if merge_mode:
-                    # Copy image into output_dir/images/
-                    target_img = os.path.join(images_dir, fname)
-                    with open(img_path, "rb") as src, open(target_img, "wb") as dst:
-                        dst.write(src.read())
+                    md_fp.write(f"## {fname}\n\n")
+                    md_fp.write(f"![{fname}]({rel_img})\n\n")
 
-                    img_url = md_image_path_in_images_dir(fname)
-
-                    md_file.write(f"## {fname}\n\n")
-                    md_file.write(f"![{fname}]({img_url})\n\n")
-
-                    # The model output already starts with "## {filename}" per prompt.
-                    # To avoid duplicated headings, strip the first heading if present.
                     stripped = text.strip()
                     if stripped.startswith(f"## {fname}"):
                         stripped = stripped[len(f"## {fname}"):].lstrip()
-                    md_file.write(stripped + "\n\n---\n\n")
+
+                    md_fp.write(stripped + "\n\n---\n\n")
 
                 else:
-                    # Per-image markdown mode (no merged md). Keep original behavior.
+                    md_path = os.path.join(output_dir, f"{os.path.splitext(fname)[0]}.md")
                     with open(md_path, "w", encoding="utf-8") as f:
-                        f.write(text.strip() + "\n")
+                        f.write(text)
 
-                progress.console.print(f"[green]Done:[/green] {fname}")
                 progress.advance(task)
 
-    if merge_mode:
-        md_file.close()
-        console.print(f"Markdown generated: {merged_md_path}")
+    if md_fp:
+        md_fp.close()
 
         if export_pdf_flag:
-            pdf_path = os.path.join(output_dir, f"{zip_name}.pdf")
-            try:
-                export_pdf(merged_md_path, pdf_path)
-                console.print(f"PDF generated: {pdf_path}")
-            except FileNotFoundError:
-                console.print("[red]pandoc not found. Install pandoc to export PDF.[/red]")
-            except subprocess.CalledProcessError as e:
-                console.print(f"[red]PDF export failed:[/red] {e}")
+            pdf_path = os.path.join(output_dir, f"{base_name}.pdf")
+            export_pdf(merged_md_path, pdf_path)
+            console.print(f"[green]PDF generated:[/green] {pdf_path}")
 
 
 # =============================
-# Main
+# CLI
 # =============================
 def main():
     if not os.path.isdir(DATA_DIR):
@@ -284,53 +274,45 @@ def main():
 
     os.makedirs(RESULT_DIR, exist_ok=True)
 
-    zip_files = sorted(f for f in os.listdir(DATA_DIR) if f.lower().endswith(".zip"))
+    input_files = sorted(
+        f for f in os.listdir(DATA_DIR)
+        if f.lower().endswith((".zip", ".pdf"))
+    )
 
-    if not zip_files:
-        console.print("[red]No zip files found in ppt_data.[/red]")
+    if not input_files:
+        console.print("[red]No input files found.[/red]")
         return
 
-    console.print("\n[bold cyan]Available ZIP files[/bold cyan]")
-    for i, name in enumerate(zip_files, 1):
+    console.print("\n[bold cyan]Available input files[/bold cyan]")
+    for i, name in enumerate(input_files, 1):
         console.print(f"  [cyan]{i}[/cyan]. {name}")
     console.print("  [cyan]a[/cyan]. Process all")
 
-    choice = console.input("\nSelect ZIP: ").strip().lower()
+    choice = console.input("\nSelect file(s): ").strip().lower()
 
     console.print("\nOutput format:")
-    console.print("  [1] One .md file per image")
-    console.print("  [2] Merge into a single markdown file")
+    console.print("  [1] One .md per image")
+    console.print("  [2] Merge into one markdown")
     mode = console.input("Select: ").strip()
 
     merge_mode = mode == "2"
 
     export_pdf_flag = False
     if merge_mode:
-        pdf_choice = console.input("\nExport PDF as well? (y/n) [n]: ").strip().lower()
-        export_pdf_flag = pdf_choice == "y"
+        export_pdf_flag = console.input("Export PDF as well? (y/n) [n]: ").strip().lower() == "y"
 
-    try:
-        model_id = get_model_id()
-    except Exception as e:
-        console.print(f"[red]Failed to load model list:[/red] {e}")
-        return
-
+    model_id = get_model_id()
     console.print(f"\nUsing model: [bold]{model_id}[/bold]\n")
 
-    if choice == "a":
-        for z in zip_files:
-            process_zip(os.path.join(DATA_DIR, z), model_id, merge_mode, export_pdf_flag)
-    else:
-        if not choice.isdigit():
-            console.print("[red]Invalid input.[/red]")
-            return
+    targets = input_files if choice == "a" else [input_files[int(choice) - 1]]
 
-        idx = int(choice) - 1
-        if idx < 0 or idx >= len(zip_files):
-            console.print("[red]Invalid selection.[/red]")
-            return
-
-        process_zip(os.path.join(DATA_DIR, zip_files[idx]), model_id, merge_mode, export_pdf_flag)
+    for file in targets:
+        process_input_file(
+            os.path.join(DATA_DIR, file),
+            model_id,
+            merge_mode,
+            export_pdf_flag,
+        )
 
 
 if __name__ == "__main__":

@@ -126,12 +126,11 @@ def export_pdf(md_path: str, output_pdf: str, resource_dir: str):
     cmd = [
         "pandoc",
         md_path,
-        "-o",
-        output_pdf,
+        "-o", output_pdf,
         "--pdf-engine=xelatex",
-        "--resource-path",
-        resource_dir,
-        "-V", "mainfont=Noto Sans CJK KR",
+        "--resource-path", resource_dir,
+        "-V", "mainfont=Noto Sans",
+        "-V", "CJKmainfont=Noto Sans CJK KR",
     ]
     subprocess.run(cmd, check=True)
 

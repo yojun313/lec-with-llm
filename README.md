@@ -81,13 +81,13 @@ pip install requests python-dotenv rich
 To enable Markdown → PDF conversion:
 
 ```bash
-sudo apt install pandoc texlive-xetex
+sudo apt install pandoc texlive-xetex fonts-noto-cjk
 ```
 
 If you do not want LaTeX, you may alternatively install:
 
 ```bash
-sudo apt install wkhtmltopdf
+sudo apt install wkhtmltopdf fonts-noto-cjk
 ```
 
 ---

@@ -267,7 +267,7 @@ def process_zip(zip_path: str, model_id: str, merge_mode: bool, export_pdf_flag:
         if export_pdf_flag:
             pdf_path = os.path.join(output_dir, f"{zip_name}.pdf")
             try:
-                export_pdf(merged_md_path, pdf_path, output_dir)
+                export_pdf(merged_md_path, pdf_path)
                 console.print(f"PDF generated: {pdf_path}")
             except FileNotFoundError:
                 console.print("[red]pandoc not found. Install pandoc to export PDF.[/red]")

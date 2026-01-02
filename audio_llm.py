@@ -23,7 +23,7 @@ os.makedirs(RESULT_DIR, exist_ok=True)
 # ======================
 # Server config
 # ======================
-API_URL = os.getenv("AUDIO_LLM_URL", "").rstrip("/") + "/whisper"
+API_URL = os.getenv("AUDIO_LLM_URL", "")
 TOKEN = os.getenv("TOKEN", "EMPTY")
 
 HEADERS = {}

@@ -14,7 +14,7 @@ from rich.panel import Panel
 # =============================
 load_dotenv()
 
-BASE_URL = os.getenv("URL")
+BASE_URL = os.getenv("PPT_LLM_URL")
 TOKEN = os.getenv("TOKEN", "EMPTY")
 
 HEADERS = {
@@ -23,7 +23,7 @@ HEADERS = {
 }
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-DATA_DIR = os.path.join(SCRIPT_DIR, "ppt_daat")
+DATA_DIR = os.path.join(SCRIPT_DIR, "ppt_data")
 RESULT_DIR = os.path.join(SCRIPT_DIR, "ppt_result")
 
 IMAGE_EXTS = (".png", ".jpg", ".jpeg")

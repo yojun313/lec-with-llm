@@ -4,7 +4,7 @@ import tempfile
 import requests
 import base64
 from dotenv import load_dotenv
-
+import urllib.parse
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn, TimeElapsedColumn
 from rich.panel import Panel
@@ -83,10 +83,8 @@ def describe_image(model_id, image_path):
 
 설명에는 다음을 포함한다:
 - 슬라이드의 주제
-- 핵심 내용 요약
 - 도표나 그림의 의미
 - 전공 ppt에 대한 자세한 설명
-이것들을 포함해서 최대한 길고 자세하게 설명해줘. 
 """
 
     payload = {
@@ -104,19 +102,21 @@ def describe_image(model_id, image_path):
             }
         ],
         "temperature": 0.3,
-        "max_tokens": 800,
+        "max_tokens": 1600,
     }
 
     resp = requests.post(
         f"{BASE_URL}/chat/completions",
         headers=HEADERS,
         json=payload,
-        timeout=180,
+        timeout=360,
     )
 
     resp.raise_for_status()
     return resp.json()["choices"][0]["message"]["content"]
 
+def md_image_path(filename: str) -> str:
+    return "./" + urllib.parse.quote(filename)
 
 # =============================
 # zip 처리
@@ -181,9 +181,10 @@ def process_zip(zip_path, model_id, merge_mode: bool):
                     target_img = os.path.join(output_dir, fname)
                     with open(img_path, "rb") as src, open(target_img, "wb") as dst:
                         dst.write(src.read())
-
+                        
+                    img_url = md_image_path(fname)
                     readme_file.write(f"## {fname}\n\n")
-                    readme_file.write(f"![{fname}]({fname})\n\n")
+                    readme_file.write(f"![{fname}]({img_url})\n\n")
                     readme_file.write(text.strip() + "\n\n---\n\n")
 
                 else:

@@ -1,10 +1,9 @@
-# Lecture note & Audio Processing Tools (LLM-based)
+# Lecture Note & Audio Processing Tools (LLM-based)
 
 This repository provides two command-line tools for lecture processing:
 
-1. **Lecture note Slide Description Generator**
-
-   - Converts slide images inside ZIP files or PDF files into Markdown descriptions
+1. **Lecture Note Slide Description Generator**
+   - Converts lecture slides from **ZIP / PDF / PPT / PPTX** into structured Markdown descriptions
    - Optionally exports formatted PDF files (vertical & horizontal layouts)
 
 2. **Audio Transcription Tool**
@@ -23,6 +22,9 @@ Both tools support **OpenAI APIs** or **OpenAI-compatible custom servers**, sele
 - `pandoc` (Markdown → HTML)
 - `wkhtmltopdf` (HTML → PDF)
 - `poppler` (PDF → images)
+- `LibreOffice` (PPT -> PDF) 
+
+---
 
 ### Install system dependencies
 
@@ -30,19 +32,25 @@ Both tools support **OpenAI APIs** or **OpenAI-compatible custom servers**, sele
 
 ```bash
 sudo apt update
-sudo apt install -y pandoc wkhtmltopdf poppler-utils
-```
+sudo apt install -y \
+  pandoc \
+  wkhtmltopdf \
+  poppler-utils \
+  libreoffice
+````
 
 #### macOS (Homebrew)
 
 ```bash
-brew install pandoc wkhtmltopdf poppler
+brew install pandoc wkhtmltopdf poppler libreoffice
 ```
 
-Make sure `wkhtmltopdf` is available in your PATH:
+Verify required binaries:
 
 ```bash
+pandoc --version
 wkhtmltopdf --version
+soffice --version
 ```
 
 ---
@@ -70,7 +78,8 @@ Pillow
 
 ## Environment Configuration
 
-Create a `.env` file in the project root. (Check .env.example)
+Create a `.env` file in the project root.
+Refer to `.env.example` if provided.
 
 ---
 
@@ -88,31 +97,33 @@ LLM_PROVIDER=custom
 
 ---
 
-## OpenAI Configuration (when `LLM_PROVIDER=openai`)
+## OpenAI Configuration (`LLM_PROVIDER=openai`)
 
 ```env
 OPENAI_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxx
 OPENAI_MODEL=gpt-4o
 ```
 
-- `OPENAI_MODEL` examples:
+Supported model examples:
 
-  - `gpt-4o`
-  - `gpt-4o-mini`
-  - `gpt-4.1`
+* `gpt-4o`
+* `gpt-4o-mini`
+* `gpt-4.1`
 
 ---
 
-## Custom Server Configuration (when `LLM_PROVIDER=custom`)
+## Custom Server Configuration (`LLM_PROVIDER=custom`)
 
 ```env
 PPT_LLM_URL=http://localhost:8000/v1
 CUSTOM_TOKEN=your_custom_token_here
 ```
 
-- Server must be **OpenAI-compatible**
-- Must support `/v1/chat/completions`
-- Optionally accept `Authorization: Bearer <token>`
+Requirements for custom server:
+
+* OpenAI-compatible API
+* Must support `/v1/chat/completions`
+* Should accept `Authorization: Bearer <token>`
 
 ---
 
@@ -127,7 +138,9 @@ project/
 │   └── pdf_style_landscape.css
 ├── ppt_data/
 │   ├── *.zip
-│   └── *.pdf
+│   ├── *.pdf
+│   ├── *.ppt
+│   └── *.pptx
 ├── audio_data/
 │   └── *.mp3
 ├── ppt_result/
@@ -139,24 +152,48 @@ project/
 
 ---
 
-# Part 1. PPT Slide Description Tool
+# Part 1. Lecture Slide Description Tool
 
-This tool processes slide images (ZIP or PDF) and generates structured Markdown descriptions using an LLM.
+This tool analyzes lecture slides and generates detailed Markdown explanations using an LLM.
 
 ---
 
-## Input Formats
+## Supported Input Formats
 
-Supported input types inside `ppt_data/`:
+Place input files inside `ppt_data/`.
 
-- `.zip` → archive containing slide images
-- `.pdf` → multipage PDF (each page converted to image)
+### Supported file types
 
-Supported image formats:
+| Type             | Description                                    |
+| ---------------- | ---------------------------------------------- |
+| `.zip`           | ZIP archive containing slide images            |
+| `.pdf`           | Multi-page PDF (each page becomes one slide)   |
+| `.ppt` / `.pptx` | PowerPoint files (converted to PDF internally) |
 
-- `.png`
-- `.jpg`
-- `.jpeg`
+### Supported image formats (inside ZIP / PDF conversion)
+
+* `.png`
+* `.jpg`
+* `.jpeg`
+
+---
+
+## PPT / PPTX Processing Flow
+
+When a PowerPoint file is provided:
+
+```
+.ppt / .pptx
+   ↓ (LibreOffice / soffice)
+PDF
+   ↓ (poppler + pdf2image)
+PNG images (one per slide)
+   ↓
+LLM-based slide description
+```
+
+* Animations and transitions are flattened
+* Only the final visual state of each slide is analyzed
 
 ---
 
@@ -170,30 +207,33 @@ python ppt_llm.py
 
 ## Step 1: Select Input Files
 
-You will see:
+Example:
 
 ```
 Available input files
 1. lecture1.zip
 2. lecture2.pdf
+3. lecture3.pptx
 a. Process all
 ```
 
 Options:
 
-- Enter a number → process one file
-- Enter `a` → process all files
+* Enter a number → process a single file
+* Enter `a` → process all files
 
 ---
 
 ## Step 2: Choose Output Mode
 
 ```
-1. Merge into one markdown
+1. Merge into one markdown (default)
 2. One .md per image
 ```
 
-### Option 1 — Merge into one Markdown (recommended)
+---
+
+### Option 1 — Merge into One Markdown (Recommended)
 
 Creates:
 
@@ -201,47 +241,51 @@ Creates:
 ppt_result/lecture1/
 ├── lecture1.md
 ├── images/
-│   ├── slide01.png
-│   ├── slide02.png
+│   ├── slide_001.png
+│   ├── slide_002.png
 ```
 
-Markdown layout:
+Markdown structure:
 
 ```md
-## slide01.png
+## slide_001.png
 
-![slide01.png](./images/slide01.png)
+![slide_001.png](./images/slide_001.png)
 
-(description)
+(detailed description)
 
 ---
 ```
 
 ---
 
-### Option 2 — One Markdown per image
+### Option 2 — One Markdown per Slide
 
 Creates:
 
 ```
 ppt_result/lecture1/
-├── slide01.md
-├── slide02.md
+├── slide_001.md
+├── slide_002.md
 ```
 
 ---
 
 ## Optional: Export PDF
 
-When merge mode is selected, you will be prompted:
+Available only in **merge mode**.
+
+Prompt:
 
 ```
 Export PDF as well? (Y/n)
 ```
 
-If enabled, **two PDFs are generated**:
+If enabled, **two PDF files are generated**.
 
-### Output files
+---
+
+### Output Files
 
 ```
 ppt_result/lecture1/
@@ -249,36 +293,39 @@ ppt_result/lecture1/
 ├── lecture1_h.pdf   # horizontal layout
 ```
 
-### Layout explanation
+---
+
+### Layout Explanation
 
 #### Vertical PDF (`*_v.pdf`)
 
-- Image on top
-- Description below
-- Suitable for reading or printing
+* Image on top
+* Description below
+* Suitable for reading or printing
 
 #### Horizontal PDF (`*_h.pdf`)
 
-- A4 landscape
-- Image on the left
-- Description on the right
-- Ideal for slide review
+* A4 landscape
+* Image on the left
+* Description on the right
+* Optimized for slide review
 
 Layout behavior is controlled via:
 
 ```
-forms/pdf_style_vertical.css
-forms/pdf_style_landscape.css
+forms/
+├── pdf_style_vertical.css
+└── pdf_style_landscape.css
 ```
 
 ---
 
 ## PDF Generation Notes
 
-- Markdown → HTML via **pandoc**
-- HTML → PDF via **wkhtmltopdf**
-- Local image access enabled automatically
-- Temporary HTML files are deleted after PDF generation
+* Markdown → HTML via **pandoc**
+* HTML → PDF via **wkhtmltopdf**
+* Local image access enabled
+* Temporary HTML files are deleted automatically
 
 ---
 
@@ -290,7 +337,7 @@ This tool sends audio files to a Whisper-compatible API and saves transcription 
 
 ## Input Directory
 
-Place audio files in:
+Place audio files inside:
 
 ```
 audio_data/
@@ -298,7 +345,7 @@ audio_data/
 
 Supported formats:
 
-- `.mp3`
+* `.mp3`
 
 ---
 
@@ -328,7 +375,7 @@ a. Process all
 3 = large
 ```
 
-This value is forwarded to the Whisper-compatible server.
+This value is forwarded directly to the Whisper-compatible server.
 
 ---
 
@@ -356,14 +403,25 @@ ja
 
 ## Output Files
 
-### Text only
+### Text Only
 
 ```
 audio_result/lecture1.txt
 ```
 
-### With timestamps
+### With Timestamps
 
 ```
 audio_result/lecture1_with_time.txt
 ```
+
+---
+
+## Notes
+
+* Both tools are CLI-based
+* Designed for offline batch processing
+* Custom LLM / ASR servers must be OpenAI-compatible
+* Suitable for lecture archiving, study notes, and review materials
+
+---

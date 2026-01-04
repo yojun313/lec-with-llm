@@ -5,6 +5,7 @@ import requests
 import base64
 import urllib.parse
 import subprocess
+import shutil
 from pdf2image import convert_from_path
 from dotenv import load_dotenv
 from rich.console import Console
@@ -33,6 +34,7 @@ RESULT_DIR = os.path.join(SCRIPT_DIR, "ppt_result")
 
 IMAGE_EXTS = (".png", ".jpg", ".jpeg")
 PDF_EXTS = (".pdf",)
+PPT_EXTS = (".ppt", ".pptx")
 
 console = Console()
 
@@ -79,6 +81,39 @@ def image_to_data_url(path: str) -> str:
 # =============================
 # PDF → image pages
 # =============================
+
+def convert_ppt_to_pdf(ppt_path: str, output_dir: str) -> str:
+    """
+    Convert PPT/PPTX to PDF using LibreOffice (soffice).
+    Returns generated PDF path.
+    """
+    if not shutil.which("soffice"):
+        raise RuntimeError(
+            "LibreOffice(soffice)가 설치되어 있지 않습니다."
+        )
+        
+    subprocess.run(
+        [
+            "soffice",
+            "--headless",
+            "--convert-to", "pdf",
+            "--outdir", output_dir,
+            ppt_path,
+        ],
+        check=True,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+
+    base = os.path.splitext(os.path.basename(ppt_path))[0]
+    pdf_path = os.path.join(output_dir, f"{base}.pdf")
+
+    if not os.path.exists(pdf_path):
+        raise RuntimeError("Failed to convert PPT to PDF")
+
+    return pdf_path
+
+
 def extract_pdf_pages(pdf_path: str, output_dir: str) -> list[str]:
     images = convert_from_path(pdf_path, dpi=200)
 
@@ -192,8 +227,11 @@ def collect_images(input_path: str, tmp_dir: str) -> list[str]:
     elif input_path.lower().endswith(".pdf"):
         images = extract_pdf_pages(input_path, tmp_dir)
 
-    return sorted(images)
+    elif input_path.lower().endswith(PPT_EXTS):
+        pdf_path = convert_ppt_to_pdf(input_path, tmp_dir)
+        images = extract_pdf_pages(pdf_path, tmp_dir)
 
+    return sorted(images)
 
 # =============================
 # Markdown → PDF
@@ -415,7 +453,7 @@ def main():
 
         input_files = sorted(
             f for f in os.listdir(DATA_DIR)
-            if f.lower().endswith((".zip", ".pdf"))
+            if f.lower().endswith((".zip", ".pdf", ".ppt", ".pptx"))
         )
 
         if not input_files:

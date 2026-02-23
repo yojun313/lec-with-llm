@@ -4,3 +4,7 @@ rich
 pdf2image
 pdfkit
 Pillow
+fastapi
+uvicorn
+jinja2
+markdown

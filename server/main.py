@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
-from app.routes import api, views
+from app.routes import api, views, docs
 from app.core.config import settings
 
 app = FastAPI(title="LecAI")
@@ -10,6 +10,7 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # 라우터 등록
 app.include_router(views.router)
+app.include_router(docs.router)
 app.include_router(api.router, prefix="/api")
 
 if __name__ == "__main__":

@@ -41,18 +41,19 @@ def get_headers(api_key=None):
 def get_target_model(user_settings):
     """
     사용자 설정에 따라 모델 ID와 Base URL, API Key를 결정합니다.
+    OpenAI의 gpt-5.2, gpt-4o 등 다양한 모델명을 지원합니다.
     """
     pref = user_settings.get("preferred_model", "local")
     user_key = user_settings.get("openai_api_key", "")
 
-    # 1. OpenAI 모드
+    # 1. OpenAI 모드 (gpt-4o, gpt-5.2 등)
     if pref.startswith("gpt"):
         if not user_key:
             raise ValueError("OpenAI 모델이 선택되었으나 API Key가 설정되지 않았습니다.")
         
         return {
             "provider": "openai",
-            "model_id": pref, # gpt-4o, gpt-4-turbo 등
+            "model_id": pref, 
             "base_url": "https://api.openai.com/v1",
             "api_key": user_key
         }
@@ -85,7 +86,8 @@ def get_target_model(user_settings):
                 "api_key": None
             }
 
-def describe_image(image_path: str, model_config: dict):
+# [수정됨] job_id, current, total 인자 추가 (로그 기록용)
+def describe_image(image_path: str, model_config: dict, job_id: str = None, current: int = 0, total: int = 0):
     filename = os.path.basename(image_path)
     
     # 설정된 URL과 Key 사용
@@ -100,30 +102,48 @@ def describe_image(image_path: str, model_config: dict):
         mime = "image/png" if ext == ".png" else "image/jpeg"
         return f"data:{mime};base64,{encoded}"
 
+    # [CACHING STRATEGY]
+    # OpenAI Prompt Caching을 위해 'System Message'를 고정된 긴 텍스트로 분리합니다.
+    system_instruction = """
+    당신은 전공 강의 자료를 분석하고 요약하는 전문 AI 조교입니다.
+    제공되는 이미지는 강의 PPT 슬라이드입니다.
+
+    [분석 및 출력 규칙]
+    1. **반드시 Markdown 형식**으로 작성하십시오.
+    2. 언어는 **한국어**를 사용하십시오.
+    3. 인삿말, 서론, 메타 설명("이 슬라이드는...", "분석 결과입니다")은 생략하고 바로 본론만 작성하십시오.
+    4. 코드 블록(```)으로 감싸지 말고 순수 마크다운 텍스트만 출력하십시오.
+
+    [포함해야 할 내용]
+    1. **슬라이드 주제**: 슬라이드의 핵심 주제를 파악하여 요약하십시오.
+    2. **시각 자료 설명**: 그림, 도표, 그래프가 있다면 그 의미와 수치를 상세히 설명하십시오.
+    3. **상세 설명**: 전공자의 관점에서 텍스트 내용을 논리적으로 재구성하여 매우 자세하게 설명하십시오.
+    """
+
+    user_instruction = f"""
+    이 슬라이드의 파일명은 "{filename}"입니다.
+    위의 규칙에 따라 이 슬라이드를 분석해 주세요.
+    제목은 "## {filename}" 형식을 사용해 주세요.
+    """
+
     payload = {
         "model": model_config['model_id'],
         "messages": [
+            {
+                "role": "system",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": system_instruction.strip()
+                    }
+                ]
+            },
             {
                 "role": "user",
                 "content": [
                     {
                         "type": "text",
-                        "text": f"""
-                            이 이미지는 전공 PPT 슬라이드 한 장이다.
-                            이 슬라이드를 분석하여 Markdown 문서에 들어갈 설명을 작성하라.
-
-                            출력 규칙:
-                            - 반드시 Markdown 형식
-                            - 제목은 "## {filename}" 형식
-                            - 한국어 사용
-                            - 인사말, 메타 설명, 이모티콘 금지
-                            - 코드 블록 금지
-
-                            포함할 내용:
-                            - 슬라이드 주제
-                            - 그림 / 도표 설명
-                            - 전공 관점에서의 매우 자세한 설명
-                        """.strip()
+                        "text": user_instruction.strip()
                     },
                     {
                         "type": "image_url",
@@ -134,7 +154,7 @@ def describe_image(image_path: str, model_config: dict):
                 ],
             }
         ],
-        "max_tokens": 1600,
+        "max_completion_tokens": 1600,
     }
 
     resp = requests.post(url, headers=headers, json=payload, timeout=120)
@@ -143,7 +163,33 @@ def describe_image(image_path: str, model_config: dict):
         print(f"[ERROR] LLM Request Failed: {resp.text}")
         raise RuntimeError(f"LLM Error: {resp.text}")
     
-    return resp.json()["choices"][0]["message"]["content"]
+    result = resp.json()
+    content = result["choices"][0]["message"]["content"]
+
+    # [추가됨] 토큰 사용량 로깅 (OpenAI인 경우 Cached Token 확인)
+    if job_id and model_config['provider'] == 'openai':
+        try:
+            usage = result.get('usage', {})
+            p_tokens = usage.get('prompt_tokens', 0)
+            c_tokens = usage.get('completion_tokens', 0)
+            t_tokens = usage.get('total_tokens', 0)
+            
+            # OpenAI Prompt Caching 정보 확인
+            # prompt_tokens_details 안에 cached_tokens가 존재함
+            p_details = usage.get('prompt_tokens_details', {})
+            cached = p_details.get('cached_tokens', 0)
+
+            # 로그 메시지 생성
+            log_msg = f"[Token] In: {p_tokens} (Cached: {cached}) | Out: {c_tokens} | Total: {t_tokens}"
+            
+            # JobManager에 로그 기록 (진행률은 유지)
+            JobManager.update_progress(job_id, current, total, log_msg)
+            print(log_msg)
+
+        except Exception as e:
+            print(f"[WARN] Token logging failed: {e}")
+
+    return content
 
 def convert_ppt_to_pdf(ppt_path: str, output_dir: str):
     subprocess.run(
@@ -225,7 +271,7 @@ def process_file_task(job_id: str, file_path: str):
             total_pages = len(images)
             JobManager.update_progress(job_id, 0, total_pages, f"총 {total_pages}장 이미지 분석 시작")
 
-            md_content = f"# Presentation Analysis\n\n"
+            md_content = f""
             
             # 4. LLM 분석 루프
             for idx, img_path in enumerate(images, 1):
@@ -235,10 +281,10 @@ def process_file_task(job_id: str, file_path: str):
                 dst_img_path = os.path.join(result_images_dir, img_filename)
                 shutil.copy2(img_path, dst_img_path)
 
-                # 결정된 모델 설정(model_config)으로 호출
-                desc = describe_image(img_path, model_config)
+                # [수정됨] describe_image에 job_id와 진행률 정보를 넘겨서 내부에서 토큰 로그를 남기도록 함
+                desc = describe_image(img_path, model_config, job_id, idx, total_pages)
                 
-                md_content += f"## Slide {idx}\n\n"
+                md_content += f"## Slide {idx-1}\n\n"
                 md_content += f"![{img_filename}](./images/{img_filename})\n\n"
                 md_content += f"{desc}\n\n---\n\n"
 

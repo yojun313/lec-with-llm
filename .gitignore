@@ -213,3 +213,8 @@ audio_result/
 
 users.json
 history.json
+docs.json
+
+docs/
+results/
+uploads/

@@ -28,47 +28,64 @@
 </head>
 <body class="bg-dark text-white font-sans h-screen flex overflow-hidden">
 
-    <aside class="w-64 bg-sidebar border-r border-gray-800 flex flex-col hidden md:flex">
-        <div class="p-6">
-            <h1 class="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-500">
-                LecAI
-            </h1>
-            <p class="text-sm text-gray-400 mt-2">User: <span class="text-white font-bold">{{ username }}</span></p>
+    <div id="sidebarOverlay" class="fixed inset-0 bg-black/50 z-40 hidden transition-opacity duration-300 opacity-0 md:hidden"></div>
+
+    <aside id="sidebar" class="fixed inset-y-0 left-0 z-50 w-64 bg-sidebar border-r border-gray-800 flex flex-col transition-transform duration-300 transform -translate-x-full md:relative md:translate-x-0">
+        <div class="p-6 flex justify-between items-start">
+            <div>
+                <h1 class="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-500">
+                    LecAI
+                </h1>
+                <p class="text-sm text-gray-400 mt-2">User: <span class="text-white font-bold">{{ username }}</span></p>
+            </div>
+            <button id="closeSidebarBtn" class="md:hidden text-gray-400 hover:text-white mt-1">
+                <i class="fas fa-times text-xl"></i>
+            </button>
         </div>
         <nav class="flex-1 px-4 space-y-2">
             <a href="/" class="flex items-center px-4 py-3 bg-gray-800 text-blue-400 rounded-lg">
                 <i class="fas fa-columns w-6"></i>
-                <span class="font-medium">Dashboard</span>
+                <span class="font-medium ml-3">Dashboard</span>
+            </a>
+            <a href="/viewer" class="flex items-center px-4 py-3 text-gray-400 hover:bg-gray-800 hover:text-white rounded-lg transition">
+                <i class="fas fa-book-open w-6"></i>
+                <span class="ml-3">Knowledge</span>
             </a>
             <a href="/settings" class="flex items-center px-4 py-3 text-gray-400 hover:bg-gray-800 hover:text-white rounded-lg transition">
                 <i class="fas fa-cog w-6"></i>
-                <span>Settings</span>
+                <span class="ml-3">Settings</span>
             </a>
             <a href="/logout" class="flex items-center px-4 py-3 text-red-400 hover:bg-gray-800 hover:text-red-300 rounded-lg transition mt-10">
                 <i class="fas fa-sign-out-alt w-6"></i>
-                <span>Logout</span>
+                <span class="ml-3">Logout</span>
             </a>
         </nav>
     </aside>
 
     <main class="flex-1 flex flex-col min-w-0">
-        <header class="h-16 bg-card border-b border-gray-800 flex items-center justify-between px-8">
-            <h2 class="text-lg font-semibold text-gray-200">Processing Dashboard</h2>
+        <header class="h-16 bg-card border-b border-gray-800 flex items-center justify-between px-4 md:px-8">
+            <div class="flex items-center">
+                <button id="openSidebarBtn" class="md:hidden mr-4 text-gray-300 hover:text-white focus:outline-none">
+                    <i class="fas fa-bars text-xl"></i>
+                </button>
+                <h2 class="text-lg font-semibold text-gray-200">Dashboard</h2>
+            </div>
             <div class="flex items-center space-x-4">
-                <span class="text-sm text-gray-400" id="clock">00:00:00</span>
+                <span class="text-sm text-gray-400 hidden sm:block" id="clock">00:00:00</span>
                 <div class="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-500"></div>
             </div>
         </header>
 
-        <div class="flex-1 overflow-y-auto p-8">
+        <div class="flex-1 overflow-y-auto p-4 md:p-8">
+            
             <div class="mb-8">
-                <div id="drop-zone" class="bg-card border-2 border-dashed border-gray-700 rounded-xl p-10 text-center transition hover:border-blue-500 hover:bg-gray-800 cursor-pointer group">
+                <div id="drop-zone" class="bg-card border-2 border-dashed border-gray-700 rounded-xl p-6 md:p-10 text-center transition hover:border-blue-500 hover:bg-gray-800 cursor-pointer group">
                     <input type="file" id="file-input" class="hidden" multiple accept=".ppt,.pptx,.pdf,.zip,.mp3,.wav,.m4a">
                     <div class="pointer-events-none">
-                        <i class="fas fa-cloud-upload-alt text-5xl text-gray-600 group-hover:text-blue-500 mb-4 transition"></i>
-                        <h3 class="text-xl font-bold text-gray-300 group-hover:text-white">파일 업로드</h3>
-                        <p class="text-gray-500 mt-2">클릭하거나 파일을 여기에 드래그하세요 (다중 선택 가능)</p>
-                        <p class="text-xs text-gray-600 mt-1">지원: PPT, PDF, MP3, WAV</p>
+                        <i class="fas fa-cloud-upload-alt text-4xl md:text-5xl text-gray-600 group-hover:text-blue-500 mb-4 transition"></i>
+                        <h3 class="text-lg md:text-xl font-bold text-gray-300 group-hover:text-white">파일 업로드</h3>
+                        <p class="text-gray-500 mt-2 text-sm md:text-base">클릭하거나 파일을 여기에 드래그하세요 (다중 선택 가능)</p>
+                        <p class="text-xs text-gray-600 mt-1 hidden sm:block">지원: PPT, PDF, MP3, WAV</p>
                     </div>
                 </div>
             </div>
@@ -95,11 +112,11 @@
                 <div class="flex items-center space-x-3 overflow-hidden">
                     <div class="icon-box w-10 h-10 rounded-lg bg-gray-700 flex items-center justify-center flex-shrink-0 text-xl"></div>
                     <div>
-                        <h4 class="font-bold text-gray-200 truncate max-w-xs filename">Filename.pptx</h4>
+                        <h4 class="font-bold text-gray-200 truncate max-w-[150px] md:max-w-xs filename">Filename.pptx</h4>
                         <p class="text-xs text-gray-500 job-id font-mono">ID: ...</p>
                     </div>
                 </div>
-                <div class="status-badge px-3 py-1 rounded-full text-xs font-bold uppercase bg-gray-700 text-gray-300">
+                <div class="status-badge px-2 py-1 rounded-full text-[10px] md:text-xs font-bold uppercase bg-gray-700 text-gray-300">
                     Pending
                 </div>
             </div>
@@ -107,7 +124,7 @@
                 <div class="progress-bar bg-blue-600 h-2 rounded-full transition-all duration-500" style="width: 0%"></div>
             </div>
             <div class="flex justify-between text-xs text-gray-400 mb-4">
-                <span class="progress-text">준비 중...</span>
+                <span class="progress-text truncate max-w-[200px]">준비 중...</span>
                 <span class="percent-text">0%</span>
             </div>
             <div class="flex items-center justify-between border-t border-gray-700 pt-3 mt-3">
@@ -115,7 +132,7 @@
                     <i class="fas fa-terminal mr-1"></i> 로그 보기
                 </button>
                 <a href="#" target="_blank" class="download-btn hidden bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded text-xs font-bold transition">
-                    <i class="fas fa-file-archive mr-1"></i> 전체 다운로드 (.zip)
+                    <i class="fas fa-file-archive mr-1"></i> <span class="hidden sm:inline">전체 </span>다운로드
                 </a>
             </div>
             <div class="log-area hidden mt-3 bg-black rounded p-3 h-32 overflow-y-auto text-xs font-mono text-green-400 border border-gray-800"></div>
@@ -123,11 +140,19 @@
     </template>
 
     <script>
+        // --- DOM 요소 (기존) ---
         const dropZone = document.getElementById('drop-zone');
         const fileInput = document.getElementById('file-input');
         const jobContainer = document.getElementById('job-container');
         const emptyState = document.getElementById('empty-state');
         const template = document.getElementById('job-card-template');
+
+        // --- DOM 요소 (모바일 사이드바) ---
+        const sidebar = document.getElementById('sidebar');
+        const sidebarOverlay = document.getElementById('sidebarOverlay');
+        const openSidebarBtn = document.getElementById('openSidebarBtn');
+        const closeSidebarBtn = document.getElementById('closeSidebarBtn');
+
         let isPolling = false;
 
         // --- 초기화 ---
@@ -136,7 +161,24 @@
         fetchJobs(); 
         startPolling(); 
 
-        // --- 이벤트 리스너 ---
+        // --- [추가됨] 모바일 사이드바 로직 ---
+        function toggleSidebar(show) {
+            if (show) {
+                sidebar.classList.remove('-translate-x-full');
+                sidebarOverlay.classList.remove('hidden');
+                setTimeout(() => sidebarOverlay.classList.remove('opacity-0'), 10);
+            } else {
+                sidebar.classList.add('-translate-x-full');
+                sidebarOverlay.classList.add('opacity-0');
+                setTimeout(() => sidebarOverlay.classList.add('hidden'), 300);
+            }
+        }
+
+        if(openSidebarBtn) openSidebarBtn.addEventListener('click', () => toggleSidebar(true));
+        if(closeSidebarBtn) closeSidebarBtn.addEventListener('click', () => toggleSidebar(false));
+        if(sidebarOverlay) sidebarOverlay.addEventListener('click', () => toggleSidebar(false));
+
+        // --- (이하 기존 로직 동일) ---
         dropZone.addEventListener('click', () => fileInput.click());
         dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('border-blue-500', 'bg-gray-800'); });
         dropZone.addEventListener('dragleave', () => { dropZone.classList.remove('border-blue-500', 'bg-gray-800'); });
@@ -148,7 +190,6 @@
             for (const file of files) { await uploadSingleFile(file); }
         }
 
-        // --- 핵심: 카드 생성 함수 (호이스팅 문제 방지를 위해 위로 배치 가능하지만, function 선언문은 자동 호이스팅됨) ---
         function createCard(job) {
             const clone = template.content.cloneNode(true);
             const cardDiv = clone.querySelector('div');
@@ -157,7 +198,6 @@
             clone.querySelector('.filename').textContent = job.filename;
             clone.querySelector('.job-id').textContent = `ID: ${job.id.substring(0, 8)}...`;
             
-            // 아이콘 설정
             const iconBox = clone.querySelector('.icon-box');
             const lowerName = job.filename.toLowerCase();
             
@@ -177,9 +217,7 @@
 
             const deleteBtn = clone.querySelector('.delete-btn');
             deleteBtn.addEventListener('click', async () => {
-                // 임시 카드(업로드 중)는 삭제 불가 처리 (선택사항)
                 if (job.status === 'uploading') return;
-
                 if (!confirm('정말 이 작업 기록을 삭제하시겠습니까?')) return;
                 try {
                     const res = await fetch(`/api/jobs/${job.id}`, { method: 'DELETE' });
@@ -205,7 +243,7 @@
             const logArea = card.querySelector('.log-area');
 
             if (job.status === 'completed') {
-                badge.className = 'status-badge px-3 py-1 rounded-full text-xs font-bold uppercase bg-green-500/20 text-green-400 border border-green-500/50';
+                badge.className = 'status-badge px-2 py-1 rounded-full text-[10px] md:text-xs font-bold uppercase bg-green-500/20 text-green-400 border border-green-500/50';
                 badge.textContent = 'Completed';
                 progressBar.className = 'progress-bar bg-green-500 h-2 rounded-full transition-all duration-500';
                 downloadBtn.classList.remove('hidden');
@@ -215,22 +253,22 @@
                 downloadBtn.setAttribute('download', `${nameBody}.zip`);
 
             } else if (job.status === 'pending') {
-                badge.className = 'status-badge px-3 py-1 rounded-full text-xs font-bold uppercase bg-yellow-500/20 text-yellow-400 border border-yellow-500/50';
+                badge.className = 'status-badge px-2 py-1 rounded-full text-[10px] md:text-xs font-bold uppercase bg-yellow-500/20 text-yellow-400 border border-yellow-500/50';
                 badge.textContent = 'Waiting';
                 progressBar.className = 'progress-bar bg-yellow-600 h-2 rounded-full transition-all duration-500 animate-pulse';
 
             } else if (job.status === 'processing') {
-                badge.className = 'status-badge px-3 py-1 rounded-full text-xs font-bold uppercase bg-blue-500/20 text-blue-400 border border-blue-500/50';
+                badge.className = 'status-badge px-2 py-1 rounded-full text-[10px] md:text-xs font-bold uppercase bg-blue-500/20 text-blue-400 border border-blue-500/50';
                 badge.textContent = 'Processing';
                 progressBar.className = 'progress-bar bg-blue-600 h-2 rounded-full transition-all duration-500';
 
             } else if (job.status === 'failed') {
-                badge.className = 'status-badge px-3 py-1 rounded-full text-xs font-bold uppercase bg-red-500/20 text-red-400 border border-red-500/50';
+                badge.className = 'status-badge px-2 py-1 rounded-full text-[10px] md:text-xs font-bold uppercase bg-red-500/20 text-red-400 border border-red-500/50';
                 badge.textContent = 'Failed';
                 progressBar.className = 'progress-bar bg-red-500 h-2 rounded-full transition-all duration-500';
 
             } else if (job.status === 'uploading') {
-                badge.className = 'status-badge px-3 py-1 rounded-full text-xs font-bold uppercase bg-purple-500/20 text-purple-400 border border-purple-500/50';
+                badge.className = 'status-badge px-2 py-1 rounded-full text-[10px] md:text-xs font-bold uppercase bg-purple-500/20 text-purple-400 border border-purple-500/50';
                 badge.textContent = 'Uploading';
                 progressBar.className = 'progress-bar bg-purple-600 h-2 rounded-full transition-all duration-500 animate-pulse';
                 progressText.textContent = "서버로 파일 전송 중...";
@@ -269,7 +307,7 @@
             const card = createCard(tempJob);
             jobContainer.prepend(card);
             updateCardData(card, tempJob);
-            emptyState.classList.add('hidden'); // 업로드 시작하면 '없음' 메시지 즉시 숨김
+            emptyState.classList.add('hidden');
 
             const formData = new FormData();
             formData.append('file', file);
@@ -324,7 +362,6 @@
 
             const allCards = jobContainer.querySelectorAll('div[id^="job-"]');
             allCards.forEach(card => {
-                // "temp-"로 시작하는 ID는 삭제하지 않음
                 if (!existingIds.has(card.id) && !card.id.includes('temp-')) {
                     card.remove();
                 }

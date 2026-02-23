@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Settings - AI PPT</title>
+    <title>Settings - LecAI</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
 </head>
@@ -12,7 +12,7 @@
     <aside class="w-64 bg-gray-900 border-r border-gray-800 flex flex-col">
         <div class="p-6">
             <h1 class="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-500">
-                PPT AI
+                LecAI
             </h1>
             <p class="text-sm text-gray-400 mt-2">User: <span class="text-white font-bold">{{ username }}</span></p>
         </div>
@@ -20,6 +20,10 @@
             <a href="/" class="flex items-center px-4 py-3 text-gray-400 hover:bg-gray-800 hover:text-white rounded-lg transition">
                 <i class="fas fa-columns w-6"></i>
                 <span class="font-medium">Dashboard</span>
+            </a>
+            <a href="/viewer" class="flex items-center px-4 py-3 text-gray-400 hover:bg-gray-800 hover:text-white rounded-lg transition">
+                <i class="fas fa-book-open w-6"></i>
+                <span>Knowledge</span>
             </a>
             
             <a href="/settings" class="flex items-center px-4 py-3 bg-gray-800 text-blue-400 rounded-lg">
@@ -44,8 +48,8 @@
                     <label class="block text-sm font-bold mb-2 text-gray-300">PPT/PDF 분석 모델</label>
                     <select name="model" id="modelSelect" class="w-full p-3 rounded bg-gray-700 border border-gray-600 focus:border-blue-500 outline-none">
                         <option value="local">Local Server (기본 제공)</option>
-                        <option value="gpt-4o">OpenAI - GPT-4o</option>
-                        <option value="gpt-4o-mini">OpenAI - GPT-4o Mini</option>
+                        <option value="gpt-5.2">OpenAI - GPT-5.2</option>
+                        <option value="gpt-5-mini">OpenAI - GPT-5-mini</option>
                     </select>
                     <p class="text-xs text-gray-500 mt-2">Local Server는 무료지만 대기열이 있을 수 있습니다. OpenAI는 개인 API Key가 필요합니다.</p>
                 </div>

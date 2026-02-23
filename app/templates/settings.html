@@ -7,10 +7,16 @@
     <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #111827; }
+        ::-webkit-scrollbar-thumb { background: #374151; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #4b5563; }
+    </style>
 </head>
-<body class="bg-gray-900 text-white font-sans h-screen flex">
+<body class="bg-gray-950 text-white font-sans h-screen flex overflow-hidden">
 
-    <aside class="w-64 bg-gray-900 border-r border-gray-800 flex flex-col">
+    <aside class="w-64 bg-gray-900 border-r border-gray-800 flex flex-col flex-shrink-0">
         <div class="p-6">
             <h1 class="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-500">
                 LecAI
@@ -26,12 +32,10 @@
                 <i class="fas fa-book-open w-6"></i>
                 <span>Viewer</span>
             </a>
-            
             <a href="/settings" class="flex items-center px-4 py-3 bg-gray-800 text-blue-400 rounded-lg">
                 <i class="fas fa-cog w-6"></i>
                 <span>Settings</span>
             </a>
-
             <a href="/logout" class="flex items-center px-4 py-3 text-red-400 hover:bg-gray-800 hover:text-red-300 rounded-lg transition mt-10">
                 <i class="fas fa-sign-out-alt w-6"></i>
                 <span>Logout</span>
@@ -39,84 +43,114 @@
         </nav>
     </aside>
 
-    <main class="flex-1 p-10 overflow-y-auto">
-        <h2 class="text-2xl font-bold mb-6">사용자 설정</h2>
-        
-        <div class="bg-gray-800 p-8 rounded-lg shadow-lg max-w-2xl">
-            <form id="settingsForm" class="space-y-6">
-                
-                <div>
-                    <label class="block text-sm font-bold mb-2 text-gray-300">PPT/PDF 분석 모델</label>
-                    <select name="model" id="modelSelect" class="w-full p-3 rounded bg-gray-700 border border-gray-600 focus:border-blue-500 outline-none">
-                        <option value="local">Local Server (기본 제공)</option>
-                        <option value="gpt-5.2">OpenAI - GPT-5.2</option>
-                        <option value="gpt-5-mini">OpenAI - GPT-5-mini</option>
-                    </select>
-                    <p class="text-xs text-gray-500 mt-2">Local Server는 무료지만 대기열이 있을 수 있습니다. OpenAI는 개인 API Key가 필요합니다.</p>
-                </div>
+    <main class="flex-1 p-8 overflow-y-auto bg-gray-950">
+        <div class="max-w-5xl mx-auto">
+            <header class="mb-8">
+                <h2 class="text-3xl font-bold text-white">사용자 설정</h2>
+                <p class="text-gray-400 mt-1">계정 설정 및 AI 모델의 동작 방식을 개인화합니다.</p>
+            </header>
 
-                <div id="apiKeySection" class="hidden">
-                    <div class="flex justify-between items-end mb-2">
-                        <label class="block text-sm font-bold text-gray-300">OpenAI API Key</label>
-                        <a href="/guide/openai" target="_blank" class="text-xs text-blue-400 hover:text-blue-300 underline flex items-center">
-                            <i class="far fa-question-circle mr-1"></i> 발급 방법 가이드
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
+                <div class="bg-gray-900 p-6 rounded-2xl border border-gray-800 shadow-sm flex items-center justify-between transition hover:border-blue-500/50">
+                    <div>
+                        <p class="text-xs text-gray-500 uppercase font-bold tracking-wider mb-1">LecAI 누적 사용 요금</p>
+                        <h3 class="text-3xl font-mono font-bold text-blue-400" id="totalUsageText">$0.0000</h3>
+                        <p class="text-[10px] text-gray-600 mt-1">* 내부 계산치이며 실제 청구액과 차이가 있을 수 있습니다.</p>
+                    </div>
+                    <div class="bg-blue-500/10 p-4 rounded-xl">
+                        <i class="fas fa-file-invoice-dollar text-3xl text-blue-500"></i>
+                    </div>
+                </div>
+            
+                <div class="bg-gray-900 p-6 rounded-2xl border border-gray-800 shadow-sm flex items-center justify-between transition hover:border-green-500/50">
+                    <div>
+                        <p class="text-xs text-gray-500 uppercase font-bold tracking-wider mb-1">OpenAI 공식 잔액</p>
+                        <a href="https://platform.openai.com/settings/organization/billing/overview" target="_blank" 
+                           class="inline-flex items-center mt-2 px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white text-sm font-bold rounded-lg transition border border-gray-700">
+                            결제 대시보드 <i class="fas fa-external-link-alt ml-2 text-xs opacity-50"></i>
                         </a>
                     </div>
-                    <input type="password" name="api_key" id="apiKeyInput" placeholder="sk-..." 
-                           class="w-full p-3 rounded bg-gray-700 border border-gray-600 focus:border-blue-500 outline-none">
-                    <p class="text-xs text-gray-500 mt-2">키는 서버에 안전하게 저장되며, OpenAI 모델 선택 시에만 사용됩니다.</p>
-                </div>
-
-                <hr class="border-gray-700 my-6">
-
-                <div>
-                    <div class="flex justify-between items-center mb-2">
-                        <label class="block text-sm font-bold text-gray-300">System Prompt (AI 지시문)</label>
-                        <button type="button" onclick="resetPrompt()" class="text-xs text-blue-400 hover:text-blue-300 underline">
-                            기본값 복원
-                        </button>
+                    <div class="bg-green-500/10 p-4 rounded-xl">
+                        <i class="fas fa-wallet text-3xl text-green-500"></i>
                     </div>
-                    <textarea name="custom_prompt" id="customPrompt" rows="6" 
-                        class="w-full p-3 rounded bg-gray-700 border border-gray-600 focus:border-blue-500 outline-none text-sm leading-relaxed"
-                        placeholder="AI에게 내릴 지시사항을 입력하세요..."></textarea>
-                    <p class="text-xs text-gray-500 mt-2">슬라이드 분석 시 AI에게 전달될 역할을 정의합니다.</p>
                 </div>
+            </div>
+
+            <form id="settingsForm" class="space-y-8">
                 
-                <hr class="border-gray-700 my-6">
-                
-                <h3 class="text-xl font-bold mb-4 text-green-400">오디오 설정 (STT)</h3>
+                <section class="bg-gray-900 rounded-2xl border border-gray-800 overflow-hidden shadow-sm">
+                    <div class="p-6 border-b border-gray-800 bg-gray-900/50 flex items-center space-x-3">
+                        <i class="fas fa-robot text-blue-500"></i>
+                        <h3 class="text-lg font-bold">분석 모델 및 API 설정</h3>
+                    </div>
+                    <div class="p-8 space-y-6">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                            <div>
+                                <label class="block text-sm font-bold text-gray-300 mb-2">PPT/PDF 분석 모델</label>
+                                <select name="model" id="modelSelect" class="w-full p-3 rounded-xl bg-gray-800 border border-gray-700 focus:border-blue-500 outline-none transition cursor-pointer">
+                                    <option value="local">Local Server (무료/대기열 있음)</option>
+                                    <option value="gpt-5.2">OpenAI - GPT-5.2 (고성능)</option>
+                                    <option value="gpt-5-mini">OpenAI - GPT-5-mini (가성비)</option>
+                                </select>
+                            </div>
 
-                <div>
-                    <label class="block text-sm font-bold mb-2 text-gray-300">Model Level (정확도 vs 속도)</label>
-                    <select name="audio_model" id="audioModelSelect" class="w-full p-3 rounded bg-gray-700 border border-gray-600 focus:border-green-500 outline-none">
-                        <option value="1">Level 1 (Small - 빠름)</option>
-                        <option value="2">Level 2 (Medium - 균형)</option>
-                        <option value="3">Level 3 (Large - 정확함)</option>
-                    </select>
-                </div>
+                            <div id="apiKeySection" class="hidden">
+                                <div class="flex justify-between items-center mb-2">
+                                    <label class="block text-sm font-bold text-gray-300">OpenAI API Key</label>
+                                    <a href="/guide/openai" target="_blank" class="text-xs text-blue-400 hover:underline flex items-center">
+                                        <i class="far fa-question-circle mr-1"></i> 발급 방법
+                                    </a>
+                                </div>
+                                <input type="password" name="api_key" id="apiKeyInput" placeholder="sk-..." 
+                                       class="w-full p-3 rounded-xl bg-gray-800 border border-gray-700 focus:border-blue-500 outline-none transition font-mono text-sm">
+                            </div>
+                        </div>
 
-                <div class="mt-4">
-                    <label class="block text-sm font-bold mb-2 text-gray-300">Language (언어)</label>
-                    <select name="audio_lang" id="audioLangSelect" class="w-full p-3 rounded bg-gray-700 border border-gray-600 focus:border-green-500 outline-none">
-                        <option value="ko">한국어 (Korean)</option>
-                        <option value="en">영어 (English)</option>
-                        
-                        <option value="ja">일본어 (Japanese)</option>
-                        <option value="zh">중국어 (Chinese)</option>
-                        <option value="es">스페인어 (Spanish)</option>
-                        <option value="fr">프랑스어 (French)</option>
-                        <option value="de">독일어 (German)</option>
-                        <option value="ru">러시아어 (Russian)</option>
-                        <option value="it">이탈리아어 (Italian)</option>
-                        <option value="vi">베트남어 (Vietnamese)</option>
-                        <option value="th">태국어 (Thai)</option>
-                        <option value="id">인도네시아어 (Indonesian)</option>
-                    </select>
-                </div>
+                        <div class="pt-4">
+                            <div class="flex justify-between items-center mb-3">
+                                <label class="block text-sm font-bold text-gray-300">System Prompt (AI 페르소나 설정)</label>
+                                <button type="button" onclick="resetPrompt()" class="text-xs text-gray-400 hover:text-white underline">
+                                    기본값으로 초기화
+                                </button>
+                            </div>
+                            <textarea name="custom_prompt" id="customPrompt" rows="5" 
+                                class="w-full p-4 rounded-xl bg-gray-800 border border-gray-700 focus:border-blue-500 outline-none text-sm leading-relaxed transition resize-none"
+                                placeholder="AI에게 내릴 상세 지시사항을 입력하세요..."></textarea>
+                            <p class="text-xs text-gray-500 mt-2 italic">※ 분석 결과의 문체, 요약 방식 등을 자유롭게 지시할 수 있습니다.</p>
+                        </div>
+                    </div>
+                </section>
 
-                <div class="pt-6">
-                    <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-bold transition shadow-lg">
-                        설정 저장
+                <section class="bg-gray-900 rounded-2xl border border-gray-800 overflow-hidden shadow-sm">
+                    <div class="p-6 border-b border-gray-800 bg-gray-900/50 flex items-center space-x-3">
+                        <i class="fas fa-microphone-alt text-green-500"></i>
+                        <h3 class="text-lg font-bold">오디오 요약 (STT) 설정</h3>
+                    </div>
+                    <div class="p-8 grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <div>
+                            <label class="block text-sm font-bold text-gray-300 mb-2">정확도 모드</label>
+                            <select name="audio_model" id="audioModelSelect" class="w-full p-3 rounded-xl bg-gray-800 border border-gray-700 focus:border-green-500 outline-none transition cursor-pointer">
+                                <option value="1">Level 1 (빠른 처리)</option>
+                                <option value="2" selected>Level 2 (표준 균형)</option>
+                                <option value="3">Level 3 (정밀 분석)</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-bold text-gray-300 mb-2">기본 언어</label>
+                            <select name="audio_lang" id="audioLangSelect" class="w-full p-3 rounded-xl bg-gray-800 border border-gray-700 focus:border-green-500 outline-none transition cursor-pointer">
+                                <option value="ko">한국어 (Korean)</option>
+                                <option value="en">영어 (English)</option>
+                                <option value="ja">일본어 (Japanese)</option>
+                                <option value="zh">중국어 (Chinese)</option>
+                            </select>
+                        </div>
+                    </div>
+                </section>
+
+                <div class="flex justify-end pt-4 pb-12">
+                    <button type="submit" class="w-full md:w-auto px-10 py-4 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold transition transform active:scale-95 shadow-lg shadow-blue-900/20">
+                        <i class="fas fa-save mr-2"></i> 모든 설정 저장하기
                     </button>
                 </div>
             </form>
@@ -124,13 +158,11 @@
     </main>
 
     <script>
-        // 서버에서 전달받은 기존 설정 적용 (Template Engine)
+        // 서버에서 전달받은 기존 설정 적용
         const currentModel = "{{ settings.preferred_model }}";
         const currentKey = "{{ settings.openai_api_key }}";
         const currentAudioLang = "{{ settings.audio_language }}";
         const currentAudioModel = "{{ settings.audio_model_level }}";
-        
-        // [추가] 줄바꿈 문자가 자바스크립트 에러를 일으키지 않도록 이스케이프 처리
         const currentPrompt = `{{ settings.custom_prompt | safe }}`;
 
         const modelSelect = document.getElementById('modelSelect');
@@ -144,31 +176,20 @@
         modelSelect.value = currentModel || 'local';
         apiKeyInput.value = currentKey || '';
         customPrompt.value = currentPrompt;
-        
-        if (currentAudioLang === 'auto' || !currentAudioLang) {
-            audioLangSelect.value = 'ko'; 
-        } else {
-            audioLangSelect.value = currentAudioLang;
-        }
-
+        audioLangSelect.value = (currentAudioLang === 'auto' || !currentAudioLang) ? 'ko' : currentAudioLang;
         audioModelSelect.value = currentAudioModel || '2';
         
         toggleApiKeySection();
-
-        // 모델 변경 시 UI 업데이트
         modelSelect.addEventListener('change', toggleApiKeySection);
 
         function toggleApiKeySection() {
             if (modelSelect.value.startsWith('gpt')) {
                 apiKeySection.classList.remove('hidden');
-                apiKeyInput.setAttribute('required', 'required');
             } else {
                 apiKeySection.classList.add('hidden');
-                apiKeyInput.removeAttribute('required');
             }
         }
 
-        // [추가] 기본 프롬프트 복원 함수
         function resetPrompt() {
             const defaultPrompt = `당신은 전공 강의 자료를 분석하고 요약하는 전문 AI 조교입니다.
 [출력 규칙]
@@ -178,25 +199,26 @@
             customPrompt.value = defaultPrompt;
         }
 
-        // 저장 요청
         document.getElementById('settingsForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const formData = new FormData(e.target);
-            
             try {
-                const res = await fetch('/api/settings', {
-                    method: 'POST',
-                    body: formData
-                });
-                if (res.ok) {
-                    alert('설정이 저장되었습니다.');
-                } else {
-                    alert('저장 실패');
-                }
+                const res = await fetch('/api/settings', { method: 'POST', body: formData });
+                if (res.ok) alert('설정이 안전하게 저장되었습니다.');
+                else alert('저장 실패');
             } catch (err) {
                 alert('오류 발생: ' + err);
             }
         });
+
+        async function loadUsageInfo() {
+            try {
+                const res = await fetch('/api/settings/usage');
+                const data = await res.json();
+                document.getElementById('totalUsageText').textContent = `$${(data.total_spent_usd || 0).toFixed(4)}`;
+            } catch (e) { console.error(e); }
+        }
+        loadUsageInfo();
     </script>
 </body>
 </html>

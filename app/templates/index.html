@@ -25,6 +25,22 @@
         ::-webkit-scrollbar-track { background: #1e293b; }
         ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: #64748b; }
+        
+        .folder-item.selected {
+            border-color: #3b82f6;
+            background-color: rgba(59, 130, 246, 0.1);
+        }
+        /* 기존 스타일에 추가 */
+        .folder-item {
+            padding-left: var(--depth-padding); /* 계층에 따른 들여쓰기 */
+        }
+        .folder-item i.fa-chevron-right {
+            transition: transform 0.2s;
+            font-size: 0.7rem;
+        }
+        .folder-item.expanded i.fa-chevron-right {
+            transform: rotate(90deg);
+        }
     </style>
 </head>
 <body class="bg-dark text-white font-sans h-screen flex overflow-hidden">
@@ -46,19 +62,19 @@
         <nav class="flex-1 px-4 space-y-2">
             <a href="/" class="flex items-center px-4 py-3 bg-gray-800 text-blue-400 rounded-lg">
                 <i class="fas fa-columns w-6"></i>
-                <span class="font-medium ml-3">Dashboard</span>
+                <span>Dashboard</span>
             </a>
             <a href="/viewer" class="flex items-center px-4 py-3 text-gray-400 hover:bg-gray-800 hover:text-white rounded-lg transition">
                 <i class="fas fa-book-open w-6"></i>
-                <span class="ml-3">Viewer</span>
+                <span>Viewer</span>
             </a>
             <a href="/settings" class="flex items-center px-4 py-3 text-gray-400 hover:bg-gray-800 hover:text-white rounded-lg transition">
                 <i class="fas fa-cog w-6"></i>
-                <span class="ml-3">Settings</span>
+                <span>Settings</span>
             </a>
             <a href="/logout" class="flex items-center px-4 py-3 text-red-400 hover:bg-gray-800 hover:text-red-300 rounded-lg transition mt-10">
                 <i class="fas fa-sign-out-alt w-6"></i>
-                <span class="ml-3">Logout</span>
+                <span>Logout</span>
             </a>
         </nav>
     </aside>
@@ -78,15 +94,13 @@
         </header>
 
         <div class="flex-1 overflow-y-auto p-4 md:p-8">
-            
             <div class="mb-8">
                 <div id="drop-zone" class="bg-card border-2 border-dashed border-gray-700 rounded-xl p-6 md:p-10 text-center transition hover:border-blue-500 hover:bg-gray-800 cursor-pointer group">
                     <input type="file" id="file-input" class="hidden" multiple accept=".ppt,.pptx,.pdf,.zip,.mp3,.wav,.m4a">
                     <div class="pointer-events-none">
                         <i class="fas fa-cloud-upload-alt text-4xl md:text-5xl text-gray-600 group-hover:text-blue-500 mb-4 transition"></i>
                         <h3 class="text-lg md:text-xl font-bold text-gray-300 group-hover:text-white">파일 업로드</h3>
-                        <p class="text-gray-500 mt-2 text-sm md:text-base">클릭하거나 파일을 여기에 드래그하세요 (다중 선택 가능)</p>
-                        <p class="text-xs text-gray-600 mt-1 hidden sm:block">지원: PPT, PDF, MP3, WAV</p>
+                        <p class="text-gray-500 mt-2 text-sm md:text-base">클릭하거나 파일을 여기에 드래그하세요</p>
                     </div>
                 </div>
             </div>
@@ -103,6 +117,23 @@
             </div>
         </div>
     </main>
+
+    <div id="folderModal" class="fixed inset-0 bg-black/70 z-[100] hidden flex items-center justify-center backdrop-blur-sm">
+        <div class="bg-card border border-gray-700 w-full max-w-md rounded-xl shadow-2xl overflow-hidden">
+            <div class="p-6 border-b border-gray-700 flex justify-between items-center bg-sidebar">
+                <h3 class="font-bold text-lg">Viewer에 추가</h3>
+                <button onclick="closeFolderModal()" class="text-gray-400 hover:text-white"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="p-6">
+                <label class="block text-sm text-gray-400 mb-2">저장할 폴더 선택</label>
+                <div id="folder-list" class="max-h-60 overflow-y-auto space-y-1 mb-6 pr-2"></div>
+                <input type="hidden" id="selected-job-id">
+                <button id="confirmImportBtn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg transition flex items-center justify-center">
+                    <i class="fas fa-plus-circle mr-2"></i> 저장하기
+                </button>
+            </div>
+        </div>
+    </div>
 
     <template id="job-card-template">
         <div class="bg-card border border-gray-700 rounded-lg p-5 shadow-lg relative overflow-hidden transition hover:border-gray-600">
@@ -132,37 +163,38 @@
                 <button class="text-xs text-gray-500 hover:text-white toggle-log-btn">
                     <i class="fas fa-terminal mr-1"></i> 로그 보기
                 </button>
-                <a href="#" target="_blank" class="download-btn hidden bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded text-xs font-bold transition">
-                    <i class="fas fa-file-archive mr-1"></i> <span class="hidden sm:inline">전체 </span>다운로드
-                </a>
+                <div class="flex space-x-2">
+                    <button class="add-to-viewer-btn hidden bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded text-xs font-bold transition">
+                        <i class="fas fa-folder-plus mr-1"></i> Viewer에 추가
+                    </button>
+                    <a href="#" target="_blank" class="download-btn hidden bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded text-xs font-bold transition">
+                        <i class="fas fa-file-archive mr-1"></i> <span class="hidden sm:inline">전체 </span>다운로드
+                    </a>
+                </div>
             </div>
             <div class="log-area hidden mt-3 bg-black rounded p-3 h-32 overflow-y-auto text-xs font-mono text-green-400 border border-gray-800"></div>
         </div>
     </template>
 
     <script>
-        // --- DOM 요소 (기존) ---
         const dropZone = document.getElementById('drop-zone');
         const fileInput = document.getElementById('file-input');
         const jobContainer = document.getElementById('job-container');
         const emptyState = document.getElementById('empty-state');
         const template = document.getElementById('job-card-template');
-
-        // --- DOM 요소 (모바일 사이드바) ---
         const sidebar = document.getElementById('sidebar');
         const sidebarOverlay = document.getElementById('sidebarOverlay');
         const openSidebarBtn = document.getElementById('openSidebarBtn');
         const closeSidebarBtn = document.getElementById('closeSidebarBtn');
 
         let isPolling = false;
+        let selectedFolderId = 'root';
 
-        // --- 초기화 ---
         updateClock();
         setInterval(updateClock, 1000);
         fetchJobs(); 
         startPolling(); 
 
-        // --- [추가됨] 모바일 사이드바 로직 ---
         function toggleSidebar(show) {
             if (show) {
                 sidebar.classList.remove('-translate-x-full');
@@ -179,7 +211,6 @@
         if(closeSidebarBtn) closeSidebarBtn.addEventListener('click', () => toggleSidebar(false));
         if(sidebarOverlay) sidebarOverlay.addEventListener('click', () => toggleSidebar(false));
 
-        // --- (이하 기존 로직 동일) ---
         dropZone.addEventListener('click', () => fileInput.click());
         dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('border-blue-500', 'bg-gray-800'); });
         dropZone.addEventListener('dragleave', () => { dropZone.classList.remove('border-blue-500', 'bg-gray-800'); });
@@ -212,24 +243,17 @@
                 iconBox.innerHTML = '<i class="fas fa-file-powerpoint text-orange-400"></i>';
             }
 
-            const logBtn = clone.querySelector('.toggle-log-btn');
-            const logArea = clone.querySelector('.log-area');
-            logBtn.addEventListener('click', () => { logArea.classList.toggle('hidden'); });
+            clone.querySelector('.toggle-log-btn').addEventListener('click', () => { 
+                cardDiv.querySelector('.log-area').classList.toggle('hidden'); 
+            });
 
-            const deleteBtn = clone.querySelector('.delete-btn');
-            deleteBtn.addEventListener('click', async () => {
+            clone.querySelector('.delete-btn').addEventListener('click', async () => {
                 if (job.status === 'uploading') return;
                 if (!confirm('정말 이 작업 기록을 삭제하시겠습니까?')) return;
                 try {
                     const res = await fetch(`/api/jobs/${job.id}`, { method: 'DELETE' });
-                    if (res.ok) {
-                        cardDiv.remove();
-                        const remaining = jobContainer.querySelectorAll('div[id^="job-"]');
-                        if (remaining.length === 0) emptyState.classList.remove('hidden');
-                    } else {
-                        alert('삭제 실패');
-                    }
-                } catch (e) { console.error(e); alert('오류 발생'); }
+                    if (res.ok) cardDiv.remove();
+                } catch (e) { console.error(e); }
             });
 
             return cardDiv;
@@ -241,38 +265,40 @@
             const progressText = card.querySelector('.progress-text');
             const percentText = card.querySelector('.percent-text');
             const downloadBtn = card.querySelector('.download-btn');
+            const addToViewerBtn = card.querySelector('.add-to-viewer-btn');
             const logArea = card.querySelector('.log-area');
 
             if (job.status === 'completed') {
                 badge.className = 'status-badge px-2 py-1 rounded-full text-[10px] md:text-xs font-bold uppercase bg-green-500/20 text-green-400 border border-green-500/50';
                 badge.textContent = 'Completed';
                 progressBar.className = 'progress-bar bg-green-500 h-2 rounded-full transition-all duration-500';
+                
                 downloadBtn.classList.remove('hidden');
                 downloadBtn.href = job.result_url;
-                const originalName = job.filename;
-                const nameBody = originalName.substring(0, originalName.lastIndexOf('.')) || originalName;
-                downloadBtn.setAttribute('download', `${nameBody}.zip`);
+
+                addToViewerBtn.classList.remove('hidden');
+                addToViewerBtn.onclick = () => openFolderModal(job.id);
 
             } else if (job.status === 'pending') {
                 badge.className = 'status-badge px-2 py-1 rounded-full text-[10px] md:text-xs font-bold uppercase bg-yellow-500/20 text-yellow-400 border border-yellow-500/50';
                 badge.textContent = 'Waiting';
                 progressBar.className = 'progress-bar bg-yellow-600 h-2 rounded-full transition-all duration-500 animate-pulse';
+                addToViewerBtn.classList.add('hidden');
+                downloadBtn.classList.add('hidden');
 
             } else if (job.status === 'processing') {
                 badge.className = 'status-badge px-2 py-1 rounded-full text-[10px] md:text-xs font-bold uppercase bg-blue-500/20 text-blue-400 border border-blue-500/50';
                 badge.textContent = 'Processing';
                 progressBar.className = 'progress-bar bg-blue-600 h-2 rounded-full transition-all duration-500';
+                addToViewerBtn.classList.add('hidden');
+                downloadBtn.classList.add('hidden');
 
             } else if (job.status === 'failed') {
                 badge.className = 'status-badge px-2 py-1 rounded-full text-[10px] md:text-xs font-bold uppercase bg-red-500/20 text-red-400 border border-red-500/50';
                 badge.textContent = 'Failed';
                 progressBar.className = 'progress-bar bg-red-500 h-2 rounded-full transition-all duration-500';
-
-            } else if (job.status === 'uploading') {
-                badge.className = 'status-badge px-2 py-1 rounded-full text-[10px] md:text-xs font-bold uppercase bg-purple-500/20 text-purple-400 border border-purple-500/50';
-                badge.textContent = 'Uploading';
-                progressBar.className = 'progress-bar bg-purple-600 h-2 rounded-full transition-all duration-500 animate-pulse';
-                progressText.textContent = "서버로 파일 전송 중...";
+                addToViewerBtn.classList.add('hidden');
+                downloadBtn.classList.add('hidden');
             }
 
             const percent = job.progress || 0;
@@ -295,52 +321,185 @@
             }
         }
 
-        async function uploadSingleFile(file) {
-            const tempId = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-            const tempJob = {
-                id: tempId,
-                filename: file.name,
-                status: 'uploading',
-                progress: 100,
-                logs: ['파일을 서버로 전송하고 있습니다...']
-            };
-
-            const card = createCard(tempJob);
-            jobContainer.prepend(card);
-            updateCardData(card, tempJob);
-            emptyState.classList.add('hidden');
-
-            const formData = new FormData();
-            formData.append('file', file);
+        // --- [수정] 모달 제어 및 데이터 로드 ---
+        async function openFolderModal(jobId) {
+            document.getElementById('selected-job-id').value = jobId;
+            const container = document.getElementById('folder-list');
+            container.innerHTML = '<div class="text-center py-4 text-gray-500 text-sm">폴더 목록 로드 중...</div>';
+            document.getElementById('folderModal').classList.remove('hidden');
 
             try {
-                const res = await fetch('/api/upload', { method: 'POST', body: formData });
-                if (!res.ok) throw new Error('Upload failed');
-                card.remove(); 
-                fetchJobs();
-            } catch (err) {
-                updateCardData(card, {
-                    ...tempJob,
-                    status: 'failed',
-                    logs: [`업로드 실패: ${err.message}`],
-                    progress: 100
-                });
-                alert(`"${file.name}" 업로드 실패: ${err.message}`);
+                const res = await fetch('/api/docs/folders');
+                if (!res.ok) throw new Error('네트워크 응답 에러');
+                
+                const folders = await res.json();
+                
+                // 데이터가 배열인지 확인 (방어 코드)
+                if (!Array.isArray(folders)) {
+                    console.error("Expected array but got:", folders);
+                    throw new Error('데이터 형식이 올바르지 않습니다.');
+                }
+
+                renderFolderList(folders);
+            } catch (e) {
+                console.error("Folder Load Error:", e);
+                container.innerHTML = '<div class="text-center py-4 text-red-400 text-sm">목록 로드 실패</div>';
             }
         }
 
-        function startPolling() {
-            if (isPolling) return;
-            isPolling = true;
-            setInterval(fetchJobs, 2000); 
+        function renderFolderList(folders) {
+            const container = document.getElementById('folder-list');
+            container.innerHTML = '';
+
+            // name 부분에 Jinja2 변수인 {{ username }}을 적용합니다.
+            const rootItem = createFolderItem({ 
+                id: 'root', 
+                name: '{{ username }}/', // '/' 대신 사용자 ID가 들어갑니다.
+                children: [] 
+            }, 0);
+            container.appendChild(rootItem);
+
+            // 2. 평면 리스트를 트리 구조로 변환
+            const folderTree = buildTree(folders, null);
+
+            // 3. 트리 재귀 렌더링
+            const treeFragment = document.createDocumentFragment();
+            renderRecursive(folderTree, treeFragment, 1);
+            container.appendChild(treeFragment);
+
+            selectFolder('root');
         }
+
+        function buildTree(items, parentId) {
+            return items
+                .filter(item => {
+                    if (parentId === null) {
+                        // 부모가 없는 최상위 폴더들 (null 또는 'root' 문자열인 경우)
+                        return !item.parent_id || item.parent_id === 'root';
+                    }
+                    return item.parent_id === parentId;
+                })
+                .map(item => ({
+                    ...item,
+                    children: buildTree(items, item.id) // 재귀적으로 자식 탐색
+                }));
+        }
+
+        function renderRecursive(nodes, container, depth) {
+            nodes.forEach(node => {
+                const item = createFolderItem(node, depth);
+                container.appendChild(item);
+                if (node.children && node.children.length > 0) {
+                    renderRecursive(node.children, container, depth + 1);
+                }
+            });
+        }
+
+        // --- [수정] 폴더 아이템 생성 (안전한 접근 추가) ---
+        function createFolderItem(node, depth) {
+            const div = document.createElement('div');
+            const paddingLeft = 0.75 + (depth * 1.2);
+            
+            div.className = 'folder-item p-2.5 rounded-lg border border-transparent cursor-pointer hover:bg-gray-800 transition flex items-center group mb-0.5';
+            div.style.paddingLeft = `${paddingLeft}rem`;
+            div.dataset.id = node.id;
+
+            // node.children이 없을 경우를 대비해 빈 배열로 체크
+            const childrenCount = (node.children || []).length;
+            
+            div.innerHTML = `
+                <div class="flex items-center min-w-0">
+                    <i class="fas fa-folder text-yellow-500 mr-2.5 opacity-80 group-hover:opacity-100"></i>
+                    <span class="text-sm truncate text-gray-300 group-hover:text-white">${node.name}</span>
+                </div>
+            `;
+            
+            div.onclick = () => selectFolder(node.id);
+            return div;
+        }
+
+        // --- [수정] 폴더 선택 시 효과 ---
+        function selectFolder(id) {
+            selectedFolderId = id;
+            document.querySelectorAll('.folder-item').forEach(el => {
+                const span = el.querySelector('span');
+                if (el.dataset.id === id) {
+                    el.classList.add('selected', 'border-blue-500/50', 'bg-blue-500/10');
+                    if (span) {
+                        span.classList.remove('text-gray-300');
+                        span.classList.add('text-blue-400', 'font-bold');
+                    }
+                } else {
+                    el.classList.remove('selected', 'border-blue-500/50', 'bg-blue-500/10');
+                    if (span) {
+                        span.classList.remove('text-blue-400', 'font-bold');
+                        span.classList.add('text-gray-300');
+                    }
+                }
+            });
+        }
+
+        function closeFolderModal() {
+            document.getElementById('folderModal').classList.add('hidden');
+        }
+
+        document.getElementById('confirmImportBtn').addEventListener('click', async () => {
+            const jobId = document.getElementById('selected-job-id').value;
+            const btn = document.getElementById('confirmImportBtn');
+            const originalHtml = btn.innerHTML;
+
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> 처리 중...';
+
+            const formData = new FormData();
+            formData.append('parent_id', selectedFolderId);
+
+            try {
+                const res = await fetch(`/api/docs/import/${jobId}`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (res.ok) {
+                    alert('성공적으로 Viewer에 추가되었습니다.');
+                    closeFolderModal();
+                } else {
+                    const err = await res.json();
+                    alert('실패: ' + (err.detail || '오류 발생'));
+                }
+            } catch (e) {
+                alert('서버 통신 오류');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = originalHtml;
+            }
+        });
+
+        async function uploadSingleFile(file) {
+            const tempId = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+            const tempJob = { id: tempId, filename: file.name, status: 'uploading', progress: 100, logs: ['전송 중...'] };
+            const card = createCard(tempJob);
+            jobContainer.prepend(card);
+            updateCardData(card, tempJob);
+            const formData = new FormData();
+            formData.append('file', file);
+            try {
+                await fetch('/api/upload', { method: 'POST', body: formData });
+                card.remove(); 
+                fetchJobs();
+            } catch (err) {
+                updateCardData(card, { ...tempJob, status: 'failed', logs: ['업로드 실패'] });
+            }
+        }
+
+        function startPolling() { if (!isPolling) { isPolling = true; setInterval(fetchJobs, 2000); } }
 
         async function fetchJobs() {
             try {
                 const res = await fetch('/api/jobs');
                 const jobs = await res.json();
                 updateDashboard(jobs);
-            } catch (err) { console.error("Failed to fetch jobs:", err); }
+            } catch (err) { console.error(err); }
         }
 
         function updateDashboard(jobs) {
@@ -360,20 +519,10 @@
                 }
                 updateCardData(card, job);
             });
-
             const allCards = jobContainer.querySelectorAll('div[id^="job-"]');
-            allCards.forEach(card => {
-                if (!existingIds.has(card.id) && !card.id.includes('temp-')) {
-                    card.remove();
-                }
-            });
-            
-            const tempCards = jobContainer.querySelectorAll('div[id*="temp-"]');
-            if (jobs.length === 0 && tempCards.length === 0) {
-                emptyState.classList.remove('hidden');
-            } else {
-                emptyState.classList.add('hidden');
-            }
+            allCards.forEach(card => { if (!existingIds.has(card.id) && !card.id.includes('temp-')) card.remove(); });
+            if (jobs.length === 0 && !jobContainer.querySelector('div[id*="temp-"]')) emptyState.classList.remove('hidden');
+            else emptyState.classList.add('hidden');
         }
 
         function updateClock() {

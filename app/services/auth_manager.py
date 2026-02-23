@@ -191,3 +191,17 @@ class AuthManager:
             "audio_model_level": 2,
             "custom_prompt": default_prompt
         }
+    
+    @staticmethod
+    def update_user_cumulative_usage(username: str, cost_usd: float):
+        users_col.update_one(
+            {"username": username},
+            {"$inc": {"total_spent_usd": cost_usd}}
+        )
+
+    @staticmethod
+    def get_user_usage(username: str):
+        user = users_col.find_one({"username": username}, {"total_spent_usd": 1})
+        if user and "total_spent_usd" in user:
+            return user["total_spent_usd"]
+        return 0.0

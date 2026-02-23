@@ -7,6 +7,7 @@ from app.services.auth_manager import AuthManager
 from app.services.processor import process_file_task
 from app.core.config import settings
 from app.services.audio_processor import process_audio_task
+from app.db import docs_col
 import shutil
 import os
 from pydantic import BaseModel
@@ -139,3 +140,54 @@ async def save_settings(
         return {"status": "success"}
     else:
         raise HTTPException(status_code=400, detail="Update failed")
+
+@router.get("/docs/folders")
+async def get_folders(user: str = Depends(get_current_user)):
+    try:
+        # 해당 사용자가 소유한 'folder' 타입의 문서만 모두 가져옴
+        folders = list(docs_col.find({"owner": user, "type": "folder"}, {"_id": 0}))
+        return folders
+    except Exception as e:
+        print(f"[Error] get_folders: {e}")
+        raise HTTPException(status_code=500, detail="폴더 목록을 불러오지 못했습니다.")
+
+@router.post("/docs/import/{job_id}")
+async def import_job_to_docs(
+    job_id: str,
+    parent_id: str = Form(None),
+    user: str = Depends(get_current_user)
+):
+    # Job 정보 확인
+    job = JobManager.get_job(job_id)
+    if not job or job["owner"] != user:
+        raise HTTPException(status_code=404, detail="작업을 찾을 수 없습니다.")
+    
+    if job["status"] != "completed":
+        raise HTTPException(status_code=400, detail="완료된 작업만 가져올 수 있습니다.")
+    
+    # 결과 ZIP 경로 확인 (JobManager가 결과물을 .zip으로 압축해둔 위치)
+    zip_path = os.path.join(settings.RESULT_DIR, f"{job_id}.zip")
+    if not os.path.exists(zip_path):
+        raise HTTPException(status_code=404, detail="결과 파일이 존재하지 않습니다.")
+    
+    try:
+        # DocManager의 업로드 로직 재사용 (ZIP 압축해제 및 DB 등록)
+        # 프론트에서 넘어온 parent_id가 'root'이면 None으로 처리
+        real_parent_id = None if parent_id == "root" else parent_id
+        
+        new_doc = DocManager.upload_zip_doc(
+            owner=user,
+            file_path=zip_path,
+            filename=job["filename"], 
+            parent_id=real_parent_id
+        )
+        return new_doc
+    except Exception as e:
+        print(f"[Error] import_job: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/settings/usage")
+async def get_usage_info(user: str = Depends(get_current_user)):
+    # 이제 Job 기록을 전수조사하지 않고, AuthManager가 DB에서 한 줄만 읽어옵니다.
+    total_usd = AuthManager.get_user_usage(user)
+    return {"total_spent_usd": round(total_usd, 4)}

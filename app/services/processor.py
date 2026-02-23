@@ -118,7 +118,7 @@ def describe_image(image_path: str, model_config: dict):
                 {"type": "image_url", "image_url": {"url": image_to_data_url(image_path)}}
             ]}
         ],
-        "max_completion_tokens": 1600, # 호환성이 좋은 max_tokens 사용
+        "max_completion_tokens": 3000, # 호환성이 좋은 max_tokens 사용
     }
 
     # -----------------------------------------------
@@ -303,8 +303,7 @@ def _process_job_internal(job_id: str, file_path: str, model_config: dict):
                 
                 log_msg = (
                     f"분석 중 ({idx}/{total_pages}) | "
-                    f"누적 토큰: {cur_tokens:,} | "
-                    f"예상 비용: ${usd_val:.3f} (₩{krw_val:,})"
+                    f"누적 토큰: {cur_tokens:,}"
                 )
 
                 JobManager.update_progress(job_id, idx, total_pages, log_msg)
@@ -317,8 +316,14 @@ def _process_job_internal(job_id: str, file_path: str, model_config: dict):
             md_content += f"## Slide {idx}\n\n![{fname}](./images/{fname})\n\n{text}\n\n---\n\n"
 
         # 4. 최종 완료 처리
-        usd_val, krw_val = calculate_total_cost(model_config['model_id'], cumulative_usage)
-        final_log = f"작업 완료! 총 비용: ${usd_val} (약 ₩{krw_val:,}) | 총 토큰: {cumulative_usage['prompt'] + cumulative_usage['completion']}"
+        if model_config['provider'] == 'openai':
+            usd_val, krw_val = calculate_total_cost(model_config['model_id'], cumulative_usage)
+            job = JobManager.get_job(job_id)
+            if job:
+                AuthManager.update_user_cumulative_usage(job['owner'], usd_val)
+            final_log = f"작업 완료! 총 비용: ${usd_val} (약 ₩{krw_val:,}) | 총 토큰: {cumulative_usage['prompt'] + cumulative_usage['completion']}"
+        else:
+            final_log = f"작업 완료! 총 토큰: {cumulative_usage['prompt'] + cumulative_usage['completion']}"
         JobManager.update_progress(job_id, total_pages, total_pages, final_log)
         
         # Markdown 저장

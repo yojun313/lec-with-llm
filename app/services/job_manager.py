@@ -174,6 +174,33 @@ class JobManager:
         })
         
         return count
+    
+    @staticmethod
+    def get_user_total_usage(username: str):
+        """사용자의 총 누적 요금(USD) 합산"""
+
+        
+        # [방법] DB의 모든 completed 작업을 가져와서 토큰 수를 합산 후 비용 계산
+        pipeline = [
+            {"$match": {"owner": username, "status": "completed"}},
+            {"$group": {
+                "_id": None,
+                "total_prompt": {"$sum": "$cumulative_usage.prompt"},
+                "total_completion": {"$sum": "$cumulative_usage.completion"},
+                "total_cached": {"$sum": "$cumulative_usage.cached"}
+            }}
+        ]
+        
+        # (참고: _process_job_internal에서 DB 저장 시 cumulative_usage 필드를 
+        # 객체 형태로 저장하고 있다고 가정합니다.)
+        
+        result = list(history_col.aggregate(pipeline))
+        if not result:
+            return 0.0
+            
+        # 대략적인 계산 (평균 gpt-4o-mini 가격 기준 등)
+        # 더 정확하려면 각 작업 시점의 모델별 요율을 적용해야 합니다.
+        return result[0]
 
 # 모듈 로드 시 중단된 작업 상태 초기화
 JobManager.reset_interrupted_jobs()

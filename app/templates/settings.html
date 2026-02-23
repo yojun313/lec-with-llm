@@ -6,6 +6,19 @@
     <title>Settings - LecAI</title>
     <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        dark: '#0f172a',
+                        card: '#1e293b',
+                        sidebar: '#111827'
+                    }
+                }
+            }
+        }
+    </script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
         ::-webkit-scrollbar { width: 8px; }
@@ -14,202 +27,325 @@
         ::-webkit-scrollbar-thumb:hover { background: #4b5563; }
     </style>
 </head>
-<body class="bg-gray-950 text-white font-sans h-screen flex overflow-hidden">
+<body class="bg-dark text-white font-sans h-screen flex overflow-hidden">
 
-    <aside class="w-64 bg-gray-900 border-r border-gray-800 flex flex-col flex-shrink-0">
-        <div class="p-6">
-            <h1 class="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-500">
-                LecAI
-            </h1>
-            <p class="text-sm text-gray-400 mt-2">User: <span class="text-white font-bold">{{ username }}</span></p>
+    <div id="sidebarOverlay" class="fixed inset-0 bg-black/50 z-40 hidden transition-opacity duration-300 opacity-0 md:hidden"></div>
+
+    <aside id="sidebar" class="fixed inset-y-0 left-0 z-50 w-64 bg-sidebar border-r border-gray-800 flex flex-col transition-transform duration-300 transform -translate-x-full md:relative md:translate-x-0 flex-shrink-0">
+        <div class="p-6 flex justify-between items-start">
+            <div class="flex flex-col items-center w-full mb-4">
+                <div class="w-20 h-20 rounded-full border-2 border-blue-500 overflow-hidden mb-3 bg-gray-800">
+                    <img id="sidebarAvatar" src="{{ settings.profile_img or '/static/default_avatar.png' }}" class="w-full h-full object-cover">
+                </div>
+                <h1 class="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-500">
+                    LecAI
+                </h1>
+                <p class="text-sm text-gray-400 mt-2">User: <span class="text-white font-bold">{{ username }}</span></p>
+            </div>
+            <button id="closeSidebarBtn" class="md:hidden text-gray-400 hover:text-white mt-1">
+                <i class="fas fa-times text-xl"></i>
+            </button>
         </div>
         <nav class="flex-1 px-4 space-y-2">
             <a href="/" class="flex items-center px-4 py-3 text-gray-400 hover:bg-gray-800 hover:text-white rounded-lg transition">
                 <i class="fas fa-columns w-6"></i>
-                <span class="font-medium">Dashboard</span>
+                <span class="ml-3">Dashboard</span>
             </a>
             <a href="/viewer" class="flex items-center px-4 py-3 text-gray-400 hover:bg-gray-800 hover:text-white rounded-lg transition">
                 <i class="fas fa-book-open w-6"></i>
-                <span>Viewer</span>
+                <span class="ml-3">Viewer</span>
             </a>
-            <a href="/settings" class="flex items-center px-4 py-3 bg-gray-800 text-blue-400 rounded-lg">
+            <a href="/settings" class="flex items-center px-4 py-3 bg-gray-800 text-blue-400 rounded-lg shadow-sm shadow-blue-900/10">
                 <i class="fas fa-cog w-6"></i>
-                <span>Settings</span>
+                <span class="ml-3 font-medium">Settings</span>
             </a>
-            <a href="/logout" class="flex items-center px-4 py-3 text-red-400 hover:bg-gray-800 hover:text-red-300 rounded-lg transition mt-10">
-                <i class="fas fa-sign-out-alt w-6"></i>
-                <span>Logout</span>
-            </a>
+            <div class="pt-10">
+                <a href="/logout" class="flex items-center px-4 py-3 text-red-400 hover:bg-red-500/10 hover:text-red-300 rounded-lg transition">
+                    <i class="fas fa-sign-out-alt w-6"></i>
+                    <span class="ml-3 font-medium">Logout</span>
+                </a>
+            </div>
         </nav>
     </aside>
 
-    <main class="flex-1 p-8 overflow-y-auto bg-gray-950">
-        <div class="max-w-5xl mx-auto">
-            <header class="mb-8">
-                <h2 class="text-3xl font-bold text-white">사용자 설정</h2>
-                <p class="text-gray-400 mt-1">계정 설정 및 AI 모델의 동작 방식을 개인화합니다.</p>
-            </header>
-
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
-                <div class="bg-gray-900 p-6 rounded-2xl border border-gray-800 shadow-sm flex items-center justify-between transition hover:border-blue-500/50">
-                    <div>
-                        <p class="text-xs text-gray-500 uppercase font-bold tracking-wider mb-1">LecAI 누적 사용 요금</p>
-                        <h3 class="text-3xl font-mono font-bold text-blue-400" id="totalUsageText">$0.0000</h3>
-                        <p class="text-[10px] text-gray-600 mt-1">* 내부 계산치이며 실제 청구액과 차이가 있을 수 있습니다.</p>
-                    </div>
-                    <div class="bg-blue-500/10 p-4 rounded-xl">
-                        <i class="fas fa-file-invoice-dollar text-3xl text-blue-500"></i>
-                    </div>
-                </div>
-            
-                <div class="bg-gray-900 p-6 rounded-2xl border border-gray-800 shadow-sm flex items-center justify-between transition hover:border-green-500/50">
-                    <div>
-                        <p class="text-xs text-gray-500 uppercase font-bold tracking-wider mb-1">OpenAI 공식 잔액</p>
-                        <a href="https://platform.openai.com/settings/organization/billing/overview" target="_blank" 
-                           class="inline-flex items-center mt-2 px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white text-sm font-bold rounded-lg transition border border-gray-700">
-                            결제 대시보드 <i class="fas fa-external-link-alt ml-2 text-xs opacity-50"></i>
-                        </a>
-                    </div>
-                    <div class="bg-green-500/10 p-4 rounded-xl">
-                        <i class="fas fa-wallet text-3xl text-green-500"></i>
-                    </div>
+    <main class="flex-1 flex flex-col min-w-0">
+        <header class="h-16 bg-card border-b border-gray-800 flex items-center justify-between px-4 md:px-8 flex-shrink-0">
+            <div class="flex items-center">
+                <button id="openSidebarBtn" class="md:hidden mr-4 text-gray-300 hover:text-white focus:outline-none">
+                    <i class="fas fa-bars text-xl"></i>
+                </button>
+                <h2 class="text-lg font-semibold text-gray-200">Settings</h2>
+            </div>
+            <div class="flex items-center space-x-4">
+                <span class="text-sm text-gray-400 hidden sm:block" id="clock">00:00:00</span>
+                <div class="w-8 h-8 rounded-full overflow-hidden border border-gray-700 bg-gray-800">
+                    <img id="headerAvatar" src="{{ settings.profile_img or '/static/default_avatar.png' }}" class="w-full h-full object-cover">
                 </div>
             </div>
+        </header>
 
-            <form id="settingsForm" class="space-y-8">
-                
-                <section class="bg-gray-900 rounded-2xl border border-gray-800 overflow-hidden shadow-sm">
-                    <div class="p-6 border-b border-gray-800 bg-gray-900/50 flex items-center space-x-3">
-                        <i class="fas fa-robot text-blue-500"></i>
-                        <h3 class="text-lg font-bold">분석 모델 및 API 설정</h3>
+        <div class="flex-1 overflow-y-auto p-4 md:p-8 bg-gray-950">
+            <div class="max-w-5xl mx-auto">
+                <header class="mb-8">
+                    <h2 class="text-3xl font-bold text-white">사용자 설정</h2>
+                    <p class="text-gray-400 mt-1">계정 설정 및 AI 모델의 동작 방식을 개인화합니다.</p>
+                </header>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
+                    <div class="bg-gray-900 p-6 rounded-2xl border border-gray-800 flex items-center justify-between transition hover:border-blue-500/30">
+                        <div>
+                            <p class="text-xs text-gray-500 uppercase font-bold mb-1">LecAI 누적 사용 요금</p>
+                            <h3 class="text-3xl font-mono font-bold text-blue-400" id="totalUsageText">$0.0000</h3>
+                        </div>
+                        <div class="bg-blue-500/10 p-4 rounded-xl">
+                            <i class="fas fa-file-invoice-dollar text-3xl text-blue-500"></i>
+                        </div>
                     </div>
-                    <div class="p-8 space-y-6">
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                
+                    <div class="bg-gray-900 p-6 rounded-2xl border border-gray-800 flex items-center justify-between transition hover:border-green-500/30">
+                        <div>
+                            <p class="text-xs text-gray-500 uppercase font-bold mb-1">OpenAI 공식 잔액</p>
+                            <a href="https://platform.openai.com/settings/organization/billing/overview" target="_blank" 
+                               class="inline-flex items-center mt-2 text-blue-400 hover:underline font-bold">
+                                결제 대시보드 <i class="fas fa-external-link-alt ml-2 text-xs"></i>
+                            </a>
+                        </div>
+                        <div class="bg-green-500/10 p-4 rounded-xl">
+                            <i class="fas fa-wallet text-3xl text-green-500"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <section class="bg-gray-900 rounded-2xl border border-gray-800 overflow-hidden mb-8 shadow-sm">
+                    <div class="p-6 border-b border-gray-800 bg-gray-900/50 flex items-center space-x-3">
+                        <i class="fas fa-user-circle text-purple-500"></i>
+                        <h3 class="text-lg font-bold">사용자 프로필 설정</h3>
+                    </div>
+                    <div class="p-8 flex flex-col md:flex-row items-center space-y-6 md:space-y-0 md:space-x-10">
+                        <div class="relative group">
+                            <div class="w-32 h-32 rounded-full border-4 border-gray-800 overflow-hidden bg-gray-800 shadow-2xl transition group-hover:border-blue-500/50">
+                                <img id="profilePreview" src="{{ settings.profile_img or '/static/default_avatar.png' }}" class="w-full h-full object-cover">
+                            </div>
+                            <label for="profileInput" class="absolute inset-0 flex items-center justify-center bg-black/60 opacity-0 group-hover:opacity-100 transition cursor-pointer rounded-full">
+                                <i class="fas fa-camera text-2xl text-white"></i>
+                            </label>
+                            <input type="file" id="profileInput" class="hidden" accept="image/*">
+                        </div>
+                        <div class="flex-1 text-center md:text-left">
+                            <h4 class="text-xl font-bold mb-1">{{ username }}</h4>
+                            <p class="text-gray-400 text-sm mb-5">프로필 사진을 변경하려면 이미지를 클릭하세요. (JPG, PNG 지원)</p>
+                            <button id="uploadProfileBtn" class="bg-gray-800 hover:bg-gray-700 text-white px-6 py-2.5 rounded-xl text-sm font-bold transition border border-gray-700 active:scale-95">
+                                <i class="fas fa-upload mr-2"></i> 변경사항 적용
+                            </button>
+                        </div>
+                    </div>
+                </section>
+
+                <form id="settingsForm" class="space-y-8">
+                    
+                    <section class="bg-gray-900 rounded-2xl border border-gray-800 overflow-hidden shadow-sm">
+                        <div class="p-6 border-b border-gray-800 bg-gray-900/50 flex items-center space-x-3">
+                            <i class="fas fa-robot text-blue-500"></i>
+                            <h3 class="text-lg font-bold">분석 모델 및 API 설정</h3>
+                        </div>
+                        <div class="p-8 space-y-6">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                <div>
+                                    <label class="block text-sm font-bold text-gray-300 mb-2">PPT/PDF 분석 모델</label>
+                                    <select name="model" id="modelSelect" class="w-full p-3 rounded-xl bg-gray-800 border border-gray-700 focus:border-blue-500 outline-none transition cursor-pointer">
+                                        <option value="local">Local Server (무료/대기열 있음)</option>
+                                        <option value="gpt-5.2">OpenAI - GPT-5.2 (고성능)</option>
+                                        <option value="gpt-5-mini">OpenAI - GPT-5-mini (가성비)</option>
+                                    </select>
+                                </div>
+
+                                <div id="apiKeySection" class="hidden">
+                                    <div class="flex justify-between items-center mb-2">
+                                        <label class="block text-sm font-bold text-gray-300">OpenAI API Key</label>
+                                        <a href="/guide/openai" target="_blank" class="text-xs text-blue-400 hover:underline flex items-center">
+                                            <i class="far fa-question-circle mr-1"></i> 발급 방법
+                                        </a>
+                                    </div>
+                                    <input type="password" name="api_key" id="apiKeyInput" placeholder="sk-..." 
+                                           class="w-full p-3 rounded-xl bg-gray-800 border border-gray-700 focus:border-blue-500 outline-none transition font-mono text-sm">
+                                </div>
+                            </div>
+
+                            <div class="pt-4">
+                                <div class="flex justify-between items-center mb-3">
+                                    <label class="block text-sm font-bold text-gray-300">System Prompt (AI 페르소나)</label>
+                                    <button type="button" onclick="resetPrompt()" class="text-xs text-gray-400 hover:text-white underline">
+                                        기본값으로 초기화
+                                    </button>
+                                </div>
+                                <textarea name="custom_prompt" id="customPrompt" rows="5" 
+                                    class="w-full p-4 rounded-xl bg-gray-800 border border-gray-700 focus:border-blue-500 outline-none text-sm leading-relaxed transition resize-none"
+                                    placeholder="AI에게 내릴 상세 지시사항을 입력하세요..."></textarea>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="bg-gray-900 rounded-2xl border border-gray-800 overflow-hidden shadow-sm">
+                        <div class="p-6 border-b border-gray-800 bg-gray-900/50 flex items-center space-x-3">
+                            <i class="fas fa-microphone-alt text-green-500"></i>
+                            <h3 class="text-lg font-bold">오디오 요약 (STT) 설정</h3>
+                        </div>
+                        <div class="p-8 grid grid-cols-1 md:grid-cols-2 gap-8">
                             <div>
-                                <label class="block text-sm font-bold text-gray-300 mb-2">PPT/PDF 분석 모델</label>
-                                <select name="model" id="modelSelect" class="w-full p-3 rounded-xl bg-gray-800 border border-gray-700 focus:border-blue-500 outline-none transition cursor-pointer">
-                                    <option value="local">Local Server (무료/대기열 있음)</option>
-                                    <option value="gpt-5.2">OpenAI - GPT-5.2 (고성능)</option>
-                                    <option value="gpt-5-mini">OpenAI - GPT-5-mini (가성비)</option>
+                                <label class="block text-sm font-bold text-gray-300 mb-2">정확도 모드</label>
+                                <select name="audio_model" id="audioModelSelect" class="w-full p-3 rounded-xl bg-gray-800 border border-gray-700 focus:border-green-500 outline-none transition cursor-pointer">
+                                    <option value="1">Level 1 (빠른 처리)</option>
+                                    <option value="2" selected>Level 2 (표준 균형)</option>
+                                    <option value="3">Level 3 (정밀 분석)</option>
                                 </select>
                             </div>
-
-                            <div id="apiKeySection" class="hidden">
-                                <div class="flex justify-between items-center mb-2">
-                                    <label class="block text-sm font-bold text-gray-300">OpenAI API Key</label>
-                                    <a href="/guide/openai" target="_blank" class="text-xs text-blue-400 hover:underline flex items-center">
-                                        <i class="far fa-question-circle mr-1"></i> 발급 방법
-                                    </a>
-                                </div>
-                                <input type="password" name="api_key" id="apiKeyInput" placeholder="sk-..." 
-                                       class="w-full p-3 rounded-xl bg-gray-800 border border-gray-700 focus:border-blue-500 outline-none transition font-mono text-sm">
+                            <div>
+                                <label class="block text-sm font-bold text-gray-300 mb-2">기본 언어</label>
+                                <select name="audio_lang" id="audioLangSelect" class="w-full p-3 rounded-xl bg-gray-800 border border-gray-700 focus:border-green-500 outline-none transition cursor-pointer">
+                                    <option value="ko">한국어 (Korean)</option>
+                                    <option value="en">영어 (English)</option>
+                                </select>
                             </div>
                         </div>
+                    </section>
 
-                        <div class="pt-4">
-                            <div class="flex justify-between items-center mb-3">
-                                <label class="block text-sm font-bold text-gray-300">System Prompt (AI 페르소나 설정)</label>
-                                <button type="button" onclick="resetPrompt()" class="text-xs text-gray-400 hover:text-white underline">
-                                    기본값으로 초기화
-                                </button>
-                            </div>
-                            <textarea name="custom_prompt" id="customPrompt" rows="5" 
-                                class="w-full p-4 rounded-xl bg-gray-800 border border-gray-700 focus:border-blue-500 outline-none text-sm leading-relaxed transition resize-none"
-                                placeholder="AI에게 내릴 상세 지시사항을 입력하세요..."></textarea>
-                            <p class="text-xs text-gray-500 mt-2 italic">※ 분석 결과의 문체, 요약 방식 등을 자유롭게 지시할 수 있습니다.</p>
-                        </div>
+                    <div class="flex justify-end pt-4 pb-12">
+                        <button type="submit" class="w-full md:w-auto px-10 py-4 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold transition transform active:scale-95 shadow-lg shadow-blue-900/20">
+                            <i class="fas fa-save mr-2"></i> 모든 설정 저장하기
+                        </button>
                     </div>
-                </section>
-
-                <section class="bg-gray-900 rounded-2xl border border-gray-800 overflow-hidden shadow-sm">
-                    <div class="p-6 border-b border-gray-800 bg-gray-900/50 flex items-center space-x-3">
-                        <i class="fas fa-microphone-alt text-green-500"></i>
-                        <h3 class="text-lg font-bold">오디오 요약 (STT) 설정</h3>
-                    </div>
-                    <div class="p-8 grid grid-cols-1 md:grid-cols-2 gap-8">
-                        <div>
-                            <label class="block text-sm font-bold text-gray-300 mb-2">정확도 모드</label>
-                            <select name="audio_model" id="audioModelSelect" class="w-full p-3 rounded-xl bg-gray-800 border border-gray-700 focus:border-green-500 outline-none transition cursor-pointer">
-                                <option value="1">Level 1 (빠른 처리)</option>
-                                <option value="2" selected>Level 2 (표준 균형)</option>
-                                <option value="3">Level 3 (정밀 분석)</option>
-                            </select>
-                        </div>
-
-                        <div>
-                            <label class="block text-sm font-bold text-gray-300 mb-2">기본 언어</label>
-                            <select name="audio_lang" id="audioLangSelect" class="w-full p-3 rounded-xl bg-gray-800 border border-gray-700 focus:border-green-500 outline-none transition cursor-pointer">
-                                <option value="ko">한국어 (Korean)</option>
-                                <option value="en">영어 (English)</option>
-                                <option value="ja">일본어 (Japanese)</option>
-                                <option value="zh">중국어 (Chinese)</option>
-                            </select>
-                        </div>
-                    </div>
-                </section>
-
-                <div class="flex justify-end pt-4 pb-12">
-                    <button type="submit" class="w-full md:w-auto px-10 py-4 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold transition transform active:scale-95 shadow-lg shadow-blue-900/20">
-                        <i class="fas fa-save mr-2"></i> 모든 설정 저장하기
-                    </button>
-                </div>
-            </form>
+                </form>
+            </div>
         </div>
     </main>
 
     <script>
-        // 서버에서 전달받은 기존 설정 적용
-        const currentModel = "{{ settings.preferred_model }}";
-        const currentKey = "{{ settings.openai_api_key }}";
-        const currentAudioLang = "{{ settings.audio_language }}";
-        const currentAudioModel = "{{ settings.audio_model_level }}";
-        const currentPrompt = `{{ settings.custom_prompt | safe }}`;
+        // 사이드바 토글 로직
+        const sidebar = document.getElementById('sidebar');
+        const sidebarOverlay = document.getElementById('sidebarOverlay');
+        const openSidebarBtn = document.getElementById('openSidebarBtn');
+        const closeSidebarBtn = document.getElementById('closeSidebarBtn');
 
-        const modelSelect = document.getElementById('modelSelect');
-        const apiKeySection = document.getElementById('apiKeySection');
-        const apiKeyInput = document.getElementById('apiKeyInput');
-        const audioLangSelect = document.getElementById('audioLangSelect');
-        const audioModelSelect = document.getElementById('audioModelSelect');
-        const customPrompt = document.getElementById('customPrompt');
-
-        // 초기값 세팅
-        modelSelect.value = currentModel || 'local';
-        apiKeyInput.value = currentKey || '';
-        customPrompt.value = currentPrompt;
-        audioLangSelect.value = (currentAudioLang === 'auto' || !currentAudioLang) ? 'ko' : currentAudioLang;
-        audioModelSelect.value = currentAudioModel || '2';
-        
-        toggleApiKeySection();
-        modelSelect.addEventListener('change', toggleApiKeySection);
-
-        function toggleApiKeySection() {
-            if (modelSelect.value.startsWith('gpt')) {
-                apiKeySection.classList.remove('hidden');
+        function toggleSidebar(show) {
+            if (show) {
+                sidebar.classList.remove('-translate-x-full');
+                sidebarOverlay.classList.remove('hidden');
+                setTimeout(() => sidebarOverlay.classList.remove('opacity-0'), 10);
             } else {
-                apiKeySection.classList.add('hidden');
+                sidebar.classList.add('-translate-x-full');
+                sidebarOverlay.classList.add('opacity-0');
+                setTimeout(() => sidebarOverlay.classList.add('hidden'), 300);
             }
         }
+        openSidebarBtn?.addEventListener('click', () => toggleSidebar(true));
+        closeSidebarBtn?.addEventListener('click', () => toggleSidebar(false));
+        sidebarOverlay?.addEventListener('click', () => toggleSidebar(false));
 
-        function resetPrompt() {
-            const defaultPrompt = `당신은 전공 강의 자료를 분석하고 요약하는 전문 AI 조교입니다.
-[출력 규칙]
-1. **반드시 Markdown 형식**으로 작성
-2. **한국어** 사용
-3. 서론 없이 본론만 바로 작성`;
-            customPrompt.value = defaultPrompt;
+        // 시계
+        function updateClock() {
+            document.getElementById('clock').textContent = new Date().toLocaleTimeString('ko-KR');
         }
+        setInterval(updateClock, 1000);
+        updateClock();
+
+        // --- 프로필 사진 처리 ---
+        const profileInput = document.getElementById('profileInput');
+        const profilePreview = document.getElementById('profilePreview');
+        const uploadProfileBtn = document.getElementById('uploadProfileBtn');
+
+        profileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (e) => profilePreview.src = e.target.result;
+                reader.readAsDataURL(file);
+            }
+        });
+
+        uploadProfileBtn.addEventListener('click', async () => {
+            const file = profileInput.files[0];
+            if (!file) { alert('선택된 사진이 없습니다.'); return; }
+            
+            uploadProfileBtn.disabled = true;
+            uploadProfileBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> 업로드 중...';
+            
+            const formData = new FormData();
+            formData.append('file', file);
+            
+            try {
+                const res = await fetch('/api/user/profile-image', { method: 'POST', body: formData });
+                if (res.ok) {
+                    const data = await res.json();
+                    // 모든 프로필 이미지 요소 업데이트
+                    document.getElementById('headerAvatar').src = data.url;
+                    document.getElementById('sidebarAvatar').src = data.url;
+                    document.getElementById('profilePreview').src = data.url;
+                    alert('프로필 사진이 성공적으로 업데이트되었습니다.');
+                } else { throw new Error(); }
+            } catch (e) {
+                alert('이미지 업로드에 실패했습니다.');
+            } finally {
+                uploadProfileBtn.disabled = false;
+                uploadProfileBtn.innerHTML = '<i class="fas fa-upload mr-2"></i> 변경사항 적용';
+            }
+        });
+
+        // --- 기존 설정 로드 및 저장 ---
+        const currentModel = "{{ settings.preferred_model }}";
+        const currentKey = "{{ settings.openai_api_key }}";
+        const currentPrompt = `{{ settings.custom_prompt | safe }}`;
+        
+        document.getElementById('modelSelect').value = currentModel || 'local';
+        document.getElementById('apiKeyInput').value = currentKey || '';
+        document.getElementById('customPrompt').value = currentPrompt;
+        
+        const toggleApi = () => {
+            document.getElementById('apiKeySection').classList.toggle('hidden', !document.getElementById('modelSelect').value.startsWith('gpt'));
+        };
+        document.getElementById('modelSelect').addEventListener('change', toggleApi);
+        toggleApi();
 
         document.getElementById('settingsForm').addEventListener('submit', async (e) => {
             e.preventDefault();
+            
+            // 1. 기본 폼 데이터 생성 (model, api_key 등)
             const formData = new FormData(e.target);
+            
+            // 2. 프로필 이미지 파일이 선택되어 있다면 추가 (중요!)
+            const profileInput = document.getElementById('profileInput');
+            if (profileInput.files[0]) {
+                formData.append('profile_img', profileInput.files[0]);
+            }
+            
             try {
-                const res = await fetch('/api/settings', { method: 'POST', body: formData });
-                if (res.ok) alert('설정이 안전하게 저장되었습니다.');
-                else alert('저장 실패');
+                const res = await fetch('/api/settings', {
+                    method: 'POST',
+                    body: formData // 파일이 포함된 multipart/form-data 전송
+                });
+                
+                if (res.ok) {
+                    const data = await res.json();
+                    // 이미지가 변경되었다면 화면 즉시 업데이트
+                    if (data.profile_url) {
+                        document.getElementById('headerAvatar').src = data.profile_url;
+                        document.getElementById('sidebarAvatar').src = data.profile_url;
+                    }
+                    alert('모든 설정과 프로필이 저장되었습니다.');
+                } else {
+                    alert('저장 실패 (에러 코드: ' + res.status + ')');
+                }
             } catch (err) {
                 alert('오류 발생: ' + err);
             }
         });
+
+        function resetPrompt() {
+            document.getElementById('customPrompt').value = `당신은 전공 강의 자료를 분석하고 요약하는 전문 AI 조교입니다.
+[출력 규칙]
+1. **반드시 Markdown 형식**으로 작성
+2. **한국어** 사용
+3. 서론 없이 본론만 바로 작성`;
+        }
 
         async function loadUsageInfo() {
             try {

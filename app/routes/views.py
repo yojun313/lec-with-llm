@@ -11,14 +11,19 @@ templates = Jinja2Templates(directory=os.path.join(os.path.dirname(__file__), ".
 
 @router.get("/")
 async def index(request: Request):
-    # 쿠키에서 세션 ID 확인
     session_id = request.cookies.get("session_id")
     user = AuthManager.get_user_by_session(session_id)
     
     if not user:
-        return RedirectResponse(url="/login", status_code=302)
-        
-    return templates.TemplateResponse("index.html", {"request": request, "username": user})
+        return RedirectResponse(url="/login")
+
+    user_settings = AuthManager.get_user_settings(user)
+
+    return templates.TemplateResponse("index.html", {
+        "request": request, 
+        "username": user,
+        "settings": user_settings  
+    })
 
 @router.get("/login")
 async def login_page(request: Request):

@@ -2,6 +2,7 @@
 
 from fastapi import APIRouter, UploadFile, File, BackgroundTasks, HTTPException, Request, Depends, Form
 from fastapi.responses import JSONResponse, HTMLResponse
+from typing import Optional, Any
 from app.services.job_manager import JobManager
 from app.services.auth_manager import AuthManager
 from app.services.processor import process_file_task
@@ -128,18 +129,40 @@ async def delete_job(job_id: str, user: str = Depends(get_current_user)):
 async def save_settings(
     model: str = Form(...),
     api_key: str = Form(""),
-    audio_lang: str = Form("auto"),
-    audio_model: int = Form(2),
-    custom_prompt: str = Form(None), # 추가됨
-    user: str = Depends(get_current_user)
+    audio_lang: str = Form("ko"),
+    audio_model: str = Form("2"),
+    custom_prompt: Optional[str] = Form(None),
+    profile_img: Optional[UploadFile] = File(None), 
+    user: Any = Depends(get_current_user)
 ):
+    try:
+        int_audio_model = int(audio_model)
+    except:
+        int_audio_model = 2
+
+    # 1. 프로필 이미지가 업로드된 경우 먼저 처리
+    profile_url = None
+    if profile_img and profile_img.filename:
+        profile_dir = "static/profiles"
+        os.makedirs(profile_dir, exist_ok=True)
+        
+        ext = os.path.splitext(profile_img.filename)[1]
+        file_path = os.path.join(profile_dir, f"{user}{ext}")
+        
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(profile_img.file, buffer)
+        profile_url = f"/{file_path}"
+
+    # 2. 사용자 설정 및 프로필 URL 업데이트
+    # AuthManager.update_user_settings에 profile_url 인자를 추가해서 호출
     success = AuthManager.update_user_settings(
-        user, api_key, model, audio_lang, audio_model, custom_prompt
+        user, api_key, model, audio_lang, int_audio_model, custom_prompt, profile_url
     )
+    
     if success:
-        return {"status": "success"}
+        return {"status": "success", "profile_url": profile_url}
     else:
-        raise HTTPException(status_code=400, detail="Update failed")
+        raise HTTPException(status_code=400, detail="설정 저장 실패")
 
 @router.get("/docs/folders")
 async def get_folders(user: str = Depends(get_current_user)):
@@ -191,3 +214,25 @@ async def get_usage_info(user: str = Depends(get_current_user)):
     # 이제 Job 기록을 전수조사하지 않고, AuthManager가 DB에서 한 줄만 읽어옵니다.
     total_usd = AuthManager.get_user_usage(user)
     return {"total_spent_usd": round(total_usd, 4)}
+
+@router.post("/user/profile-image")
+async def upload_profile_image(
+    file: UploadFile = File(...), 
+    user: str = Depends(get_current_user)
+):
+    # static/profiles 폴더 생성
+    os.makedirs("static/profiles", exist_ok=True)
+    
+    # 파일 확장자 추출 및 저장 경로 (유저별로 덮어쓰기)
+    ext = os.path.splitext(file.filename)[1]
+    file_path = f"static/profiles/{user}{ext}"
+    profile_url = f"/{file_path}"
+
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+
+    # DB 업데이트 (AuthManager에 해당 메서드 추가 필요)
+    from app.db import users_col
+    users_col.update_one({"username": user}, {"$set": {"profile_img": profile_url}})
+
+    return {"status": "success", "url": profile_url}

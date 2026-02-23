@@ -144,8 +144,7 @@ class AuthManager:
         sessions_col.delete_one({"session_id": session_id})
 
     @staticmethod
-    def update_user_settings(username, api_key, model_choice, audio_lang="auto", audio_model=2, custom_prompt=None):
-        # DB 업데이트 ($set 연산자 사용)
+    def update_user_settings(username, api_key, model_choice, audio_lang="auto", audio_model=2, custom_prompt=None, profile_url=None):
         update_data = {
             "openai_api_key": api_key,
             "preferred_model": model_choice,
@@ -153,9 +152,12 @@ class AuthManager:
             "audio_model_level": int(audio_model)
         }
         
-        # 프롬프트가 None이 아닐 때만 업데이트 (빈 문자열이어도 업데이트)
         if custom_prompt is not None:
             update_data["custom_prompt"] = custom_prompt
+            
+        # 프로필 이미지가 새로 업로드된 경우에만 경로 추가
+        if profile_url:
+            update_data["profile_img"] = profile_url
 
         result = users_col.update_one(
             {"username": username},
@@ -180,8 +182,8 @@ class AuthManager:
                 "preferred_model": user.get("preferred_model", "local"),
                 "audio_language": user.get("audio_language", "auto"),
                 "audio_model_level": user.get("audio_model_level", 2),
-                # 저장된 프롬프트가 없으면 기본값 반환
-                "custom_prompt": user.get("custom_prompt", default_prompt)
+                "custom_prompt": user.get("custom_prompt", default_prompt),
+                "profile_img": user.get("profile_img", "/static/default_avatar.png")
             }
         
         return {

@@ -25,8 +25,8 @@ sudo apt install -y libreoffice poppler-utils wkhtmltopdf ffmpeg fonts-nanum
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-repo/lec-ai.git
-cd lec-ai
+git clone https://github.com/yojun313/LecAI.git
+cd LecAI
 
 # Create and activate virtual environment
 python3 -m venv venv
@@ -40,15 +40,7 @@ pip install -r requirements.txt
 
 ### 3) Configuration
 
-Create a `.env` file in the root directory:
-
-```env
-OPENAI_API_KEY=your_api_key_here
-CUSTOM_BASE_URL=https://api.openai.com/v1
-CUSTOM_TOKEN=your_token_here
-AUDIO_LLM_URL=your_whisper_endpoint
-
-```
+Create a `.env` file in the root directory. There exists `.env.example` in root directory.
 
 ### 4) Run the Server
 
@@ -72,6 +64,6 @@ Docker ensures that all system dependencies (LibreOffice, wkhtmltopdf, etc.) are
 docker-compose up -d --build
 
 # Check logs to verify startup
-docker logs -f lecai_container
+docker logs -f lecai
 
 ```

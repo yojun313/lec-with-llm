@@ -154,11 +154,16 @@ class AuthManager:
             del sessions[session_id]
             
     @staticmethod
-    def update_user_settings(username, api_key, model_choice):
+    def update_user_settings(username, api_key, model_choice, audio_lang="auto", audio_model=2):
         users = AuthManager.load_users()
         if username in users:
             users[username]["openai_api_key"] = api_key
             users[username]["preferred_model"] = model_choice
+            
+            # [추가됨] 오디오 설정 저장
+            users[username]["audio_language"] = audio_lang
+            users[username]["audio_model_level"] = int(audio_model)
+            
             AuthManager.save_users(users)
             return True
         return False
@@ -169,5 +174,9 @@ class AuthManager:
         user = users.get(username, {})
         return {
             "openai_api_key": user.get("openai_api_key", ""),
-            "preferred_model": user.get("preferred_model", "local") # 기본값: local
+            "preferred_model": user.get("preferred_model", "local"),
+            
+            # [추가됨] 오디오 설정 (기본값: auto, level 2)
+            "audio_language": user.get("audio_language", "auto"),
+            "audio_model_level": user.get("audio_model_level", 2)
         }

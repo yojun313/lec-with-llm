@@ -34,14 +34,14 @@
         </nav>
     </aside>
 
-    <main class="flex-1 p-10">
+    <main class="flex-1 p-10 overflow-y-auto">
         <h2 class="text-2xl font-bold mb-6">사용자 설정</h2>
         
         <div class="bg-gray-800 p-8 rounded-lg shadow-lg max-w-2xl">
             <form id="settingsForm" class="space-y-6">
                 
                 <div>
-                    <label class="block text-sm font-bold mb-2 text-gray-300">사용할 모델 (Model Provider)</label>
+                    <label class="block text-sm font-bold mb-2 text-gray-300">PPT/PDF 분석 모델</label>
                     <select name="model" id="modelSelect" class="w-full p-3 rounded bg-gray-700 border border-gray-600 focus:border-blue-500 outline-none">
                         <option value="local">Local Server (기본 제공)</option>
                         <option value="gpt-4o">OpenAI - GPT-4o</option>
@@ -57,8 +57,41 @@
                     <p class="text-xs text-gray-500 mt-2">키는 서버에 안전하게 저장되며, OpenAI 모델 선택 시에만 사용됩니다.</p>
                 </div>
 
-                <div class="pt-4">
-                    <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-bold transition">
+                <hr class="border-gray-700 my-6">
+                
+                <h3 class="text-xl font-bold mb-4 text-green-400">오디오 설정 (STT)</h3>
+
+                <div>
+                    <label class="block text-sm font-bold mb-2 text-gray-300">Model Level (정확도 vs 속도)</label>
+                    <select name="audio_model" id="audioModelSelect" class="w-full p-3 rounded bg-gray-700 border border-gray-600 focus:border-green-500 outline-none">
+                        <option value="1">Level 1 (Small - 빠름)</option>
+                        <option value="2">Level 2 (Medium - 균형)</option>
+                        <option value="3">Level 3 (Large - 정확함)</option>
+                    </select>
+                </div>
+
+                <div class="mt-4">
+                    <label class="block text-sm font-bold mb-2 text-gray-300">Language (언어)</label>
+                    <select name="audio_lang" id="audioLangSelect" class="w-full p-3 rounded bg-gray-700 border border-gray-600 focus:border-green-500 outline-none">
+                        <option value="ko">한국어 (Korean)</option>
+                        <option value="en">영어 (English)</option>
+                        
+                        <option value="ja">일본어 (Japanese)</option>
+                        <option value="zh">중국어 (Chinese)</option>
+                        <option value="es">스페인어 (Spanish)</option>
+                        <option value="fr">프랑스어 (French)</option>
+                        <option value="de">독일어 (German)</option>
+                        <option value="ru">러시아어 (Russian)</option>
+                        <option value="it">이탈리아어 (Italian)</option>
+                        <option value="vi">베트남어 (Vietnamese)</option>
+                        <option value="th">태국어 (Thai)</option>
+                        <option value="id">인도네시아어 (Indonesian)</option>
+                    </select>
+                    <p class="text-xs text-gray-500 mt-2">분석할 오디오의 언어를 선택해주세요.</p>
+                </div>
+
+                <div class="pt-6">
+                    <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-bold transition shadow-lg">
                         설정 저장
                     </button>
                 </div>
@@ -70,14 +103,28 @@
         // 서버에서 전달받은 기존 설정 적용
         const currentModel = "{{ settings.preferred_model }}";
         const currentKey = "{{ settings.openai_api_key }}";
+        const currentAudioLang = "{{ settings.audio_language }}";
+        const currentAudioModel = "{{ settings.audio_model_level }}";
 
         const modelSelect = document.getElementById('modelSelect');
         const apiKeySection = document.getElementById('apiKeySection');
         const apiKeyInput = document.getElementById('apiKeyInput');
+        const audioLangSelect = document.getElementById('audioLangSelect');
+        const audioModelSelect = document.getElementById('audioModelSelect');
 
         // 초기값 세팅
-        modelSelect.value = currentModel;
-        apiKeyInput.value = currentKey;
+        modelSelect.value = currentModel || 'local';
+        apiKeyInput.value = currentKey || '';
+        
+        // 기존 설정에 'auto'가 저장되어 있다면 강제로 'ko'로 변경 (오류 방지)
+        if (currentAudioLang === 'auto' || !currentAudioLang) {
+            audioLangSelect.value = 'ko'; 
+        } else {
+            audioLangSelect.value = currentAudioLang;
+        }
+
+        audioModelSelect.value = currentAudioModel || '2';
+        
         toggleApiKeySection();
 
         // 모델 변경 시 UI 업데이트
@@ -109,7 +156,7 @@
                     alert('저장 실패');
                 }
             } catch (err) {
-                alert('오류 발생');
+                alert('오류 발생: ' + err);
             }
         });
     </script>

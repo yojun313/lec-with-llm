@@ -3,7 +3,7 @@ from fastapi.staticfiles import StaticFiles
 from app.routes import api, views
 from app.core.config import settings
 
-app = FastAPI(title="PPT AI Processor")
+app = FastAPI(title="LecAI")
 
 # 정적 파일 마운트
 app.mount("/static", StaticFiles(directory="static"), name="static")

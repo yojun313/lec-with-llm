@@ -6,6 +6,7 @@ from app.services.job_manager import JobManager
 from app.services.auth_manager import AuthManager
 from app.services.processor import process_file_task
 from app.core.config import settings
+from app.services.audio_processor import process_audio_task
 import shutil
 import os
 from pydantic import BaseModel
@@ -77,15 +78,25 @@ async def api_login(username: str = Form(...), password: str = Form(...)):
 async def upload_file(
     background_tasks: BackgroundTasks, 
     file: UploadFile = File(...), 
-    user: str = Depends(get_current_user) # 로그인 필수
+    user: str = Depends(get_current_user)
 ):
+    # 파일 저장
     file_path = os.path.join(settings.UPLOAD_DIR, file.filename)
     with open(file_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
     
-    # 작업 생성 시 user(소유자) 전달
+    # 작업 생성
     job_id = JobManager.create_job(file.filename, user)
-    background_tasks.add_task(process_file_task, job_id, file_path)
+    
+    # 확장자 확인 및 분기 처리
+    ext = os.path.splitext(file.filename)[1].lower()
+    
+    if ext in ['.mp3', '.wav', '.m4a', '.flac']:
+        # 오디오 처리기 호출
+        background_tasks.add_task(process_audio_task, job_id, file_path)
+    else:
+        # 기존 PPT/PDF 처리기 호출
+        background_tasks.add_task(process_file_task, job_id, file_path)
     
     return {"job_id": job_id, "message": "Upload successful"}
 
@@ -116,10 +127,12 @@ async def delete_job(job_id: str, user: str = Depends(get_current_user)):
 async def save_settings(
     model: str = Form(...), 
     api_key: str = Form(None), 
+    audio_lang: str = Form("auto"), # 추가
+    audio_model: int = Form(2),     # 추가
     user: str = Depends(get_current_user)
 ):
     if api_key is None:
         api_key = ""
         
-    AuthManager.update_user_settings(user, api_key, model)
+    AuthManager.update_user_settings(user, api_key, model, audio_lang, audio_model)
     return {"message": "Settings saved successfully"}

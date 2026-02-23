@@ -13,13 +13,6 @@ class Settings:
     BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     UPLOAD_DIR = os.path.join(BASE_DIR, "static", "uploads")
     RESULT_DIR = os.path.join(BASE_DIR, "static", "results")
-    
-    HISTORY_FILE = os.path.join(BASE_DIR, "history.json")
-    
-    USERS_FILE = os.path.join(BASE_DIR, "users.json")
-    SESSIONS_FILE = os.path.join(BASE_DIR, "sessions.json")
-    
-    DOCS_DATA_FILE = os.path.join(BASE_DIR, "docs.json")  # 폴더/파일 구조 데이터
     DOCS_STATIC_DIR = os.path.join(BASE_DIR, "static", "docs") # 압축 해제된 파일 저장소
 
     BASE_URL = "http://localhost:8000"

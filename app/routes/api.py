@@ -1,7 +1,7 @@
 # app/routes/api.py
 
 from fastapi import APIRouter, UploadFile, File, BackgroundTasks, HTTPException, Request, Depends, Form
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, HTMLResponse
 from app.services.job_manager import JobManager
 from app.services.auth_manager import AuthManager
 from app.services.processor import process_file_task
@@ -16,6 +16,7 @@ router = APIRouter()
 class VerifyRequest(BaseModel):
     email: str
     code: str
+
 
 # [수정됨] 회원가입 요청 (인증 메일 발송)
 @router.post("/auth/signup/request")
@@ -122,17 +123,19 @@ async def delete_job(job_id: str, user: str = Depends(get_current_user)):
         raise HTTPException(status_code=404, detail="Job not found or permission denied")
     return {"message": "Job deleted"}
 
-# [추가됨] 설정 저장 API
 @router.post("/settings")
 async def save_settings(
-    model: str = Form(...), 
-    api_key: str = Form(None), 
-    audio_lang: str = Form("auto"), # 추가
-    audio_model: int = Form(2),     # 추가
+    model: str = Form(...),
+    api_key: str = Form(""),
+    audio_lang: str = Form("auto"),
+    audio_model: int = Form(2),
+    custom_prompt: str = Form(None), # 추가됨
     user: str = Depends(get_current_user)
 ):
-    if api_key is None:
-        api_key = ""
-        
-    AuthManager.update_user_settings(user, api_key, model, audio_lang, audio_model)
-    return {"message": "Settings saved successfully"}
+    success = AuthManager.update_user_settings(
+        user, api_key, model, audio_lang, audio_model, custom_prompt
+    )
+    if success:
+        return {"status": "success"}
+    else:
+        raise HTTPException(status_code=400, detail="Update failed")

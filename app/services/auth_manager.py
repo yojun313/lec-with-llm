@@ -1,32 +1,37 @@
 # app/services/auth_manager.py
 
-import json
-import os
 import uuid
 import hashlib
 import bcrypt
 import random
-from app.core.config import settings
 from app.services.email_service import send_verification_email
+from app.db import users_col, sessions_col
 
-# 메모리 상의 활성 세션 저장소
-sessions = {}
-
+# 이메일 인증 코드는 임시 데이터이므로 메모리에 유지 (서버 재시작 시 초기화됨)
+# 운영 환경에서는 Redis나 MongoDB TTL Collection 사용을 권장
 verification_codes = {}
 
 class AuthManager:
     
+    @staticmethod
+    def _pre_hash(password: str) -> bytes:
+        """
+        bcrypt의 72바이트 제한을 우회하기 위해 
+        SHA-256으로 먼저 해싱하여 64글자(bytes)로 고정합니다.
+        """
+        return hashlib.sha256(password.encode('utf-8')).hexdigest().encode('utf-8')
+
+    @staticmethod
     def request_signup(username, password, email):
-        users = AuthManager.load_users()
-        if username in users:
+        # 1. 사용자명 중복 체크 (MongoDB)
+        if users_col.find_one({"username": username}):
             return "username_exists"
         
-        # 이메일 중복 체크
-        for user in users.values():
-            if user.get("email") == email:
-                return "email_exists"
+        # 2. 이메일 중복 체크 (MongoDB)
+        if users_col.find_one({"email": email}):
+            return "email_exists"
         
-        # 인증 코드 생성 (6자리 숫자)
+        # 인증 코드 생성
         code = str(random.randint(100000, 999999))
         
         # 메일 발송
@@ -34,14 +39,13 @@ class AuthManager:
             # 임시 저장 (검증용)
             verification_codes[email] = {
                 "username": username,
-                "password": password, # 아직 해싱 전 (실제로는 보안상 해싱해서 임시저장하는게 좋음)
+                "password": password, 
                 "code": code
             }
             return "success"
         else:
             return "mail_failed"
 
-    # [추가됨] 회원가입 완료 (2단계: 코드 검증 및 생성)
     @staticmethod
     def verify_and_create_user(email, code):
         data = verification_codes.get(email)
@@ -51,86 +55,63 @@ class AuthManager:
         if data["code"] != code:
             return False # 코드 불일치
         
-        # 검증 완료 -> 실제 계정 생성
+        # 검증 완료 -> 실제 계정 생성 준비
         username = data["username"]
         password = data["password"]
-        
-        users = AuthManager.load_users()
         
         # 비밀번호 해싱
         safe_pw = AuthManager._pre_hash(password)
         hashed_pw = bcrypt.hashpw(safe_pw, bcrypt.gensalt()).decode('utf-8')
         
-        users[username] = {
+        # MongoDB에 저장할 문서 구조
+        new_user = {
+            "username": username,
             "password": hashed_pw,
             "email": email,
-            "verified": True
+            "verified": True,
+            # 기본 설정값 초기화
+            "openai_api_key": "",
+            "preferred_model": "local",
+            "audio_language": "auto",
+            "audio_model_level": 2
         }
-        AuthManager.save_users(users)
+        
+        # DB 저장
+        users_col.insert_one(new_user)
         
         # 임시 데이터 삭제
         del verification_codes[email]
         return True
-    
-    @staticmethod
-    def load_sessions():
-        if not os.path.exists(settings.SESSIONS_FILE):
-            return {}
-        try:
-            with open(settings.SESSIONS_FILE, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except:
-            return {}
-
-    @staticmethod
-    def save_sessions(sessions_data):
-        with open(settings.SESSIONS_FILE, "w", encoding="utf-8") as f:
-            json.dump(sessions_data, f, indent=4, ensure_ascii=False)
-            
-    @staticmethod
-    def _pre_hash(password: str) -> bytes:
-        """
-        bcrypt의 72바이트 제한을 우회하기 위해 
-        SHA-256으로 먼저 해싱하여 64글자(bytes)로 고정합니다.
-        """
-        # SHA-256 해시 생성 (64글자) -> bytes로 변환
-        return hashlib.sha256(password.encode('utf-8')).hexdigest().encode('utf-8')
-
-    @staticmethod
-    def load_users():
-        if not os.path.exists(settings.USERS_FILE):
-            return {}
-        try:
-            with open(settings.USERS_FILE, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except:
-            return {}
-
-    @staticmethod
-    def save_users(users_data):
-        with open(settings.USERS_FILE, "w", encoding="utf-8") as f:
-            json.dump(users_data, f, indent=4, ensure_ascii=False)
 
     @staticmethod
     def create_user(username, password):
-        users = AuthManager.load_users()
-        if username in users:
+        """
+        (관리자용 등) 이메일 인증 없이 바로 유저 생성 시 사용
+        """
+        if users_col.find_one({"username": username}):
             return False
         
-        # 1. SHA-256 전처리 (72바이트 제한 회피)
         safe_pw = AuthManager._pre_hash(password)
-        
-        # 2. Bcrypt 해싱 (bytes 반환되므로 decode하여 문자열 저장)
         hashed_pw = bcrypt.hashpw(safe_pw, bcrypt.gensalt()).decode('utf-8')
         
-        users[username] = {"password": hashed_pw}
-        AuthManager.save_users(users)
+        new_user = {
+            "username": username,
+            "password": hashed_pw,
+            "email": "", # 이메일 없음
+            "verified": False, # 인증 안됨
+            "openai_api_key": "",
+            "preferred_model": "local",
+            "audio_language": "auto",
+            "audio_model_level": 2
+        }
+        
+        users_col.insert_one(new_user)
         return True
 
     @staticmethod
     def authenticate_user(username, password):
-        users = AuthManager.load_users()
-        user = users.get(username)
+        # DB에서 유저 조회
+        user = users_col.find_one({"username": username})
         if not user:
             return None
         
@@ -140,43 +121,73 @@ class AuthManager:
         # 비밀번호 검증
         if bcrypt.checkpw(safe_pw, stored_hash):
             session_id = str(uuid.uuid4())
-            sessions[session_id] = username
+            
+            # 세션 DB에 저장
+            sessions_col.insert_one({
+                "session_id": session_id,
+                "username": username
+            })
             return session_id
         return None
 
     @staticmethod
     def get_user_by_session(session_id):
-        return sessions.get(session_id)
+        # DB에서 세션 조회
+        session = sessions_col.find_one({"session_id": session_id})
+        if session:
+            return session["username"]
+        return None
 
     @staticmethod
     def logout(session_id):
-        if session_id in sessions:
-            del sessions[session_id]
-            
+        # DB에서 세션 삭제
+        sessions_col.delete_one({"session_id": session_id})
+
     @staticmethod
-    def update_user_settings(username, api_key, model_choice, audio_lang="auto", audio_model=2):
-        users = AuthManager.load_users()
-        if username in users:
-            users[username]["openai_api_key"] = api_key
-            users[username]["preferred_model"] = model_choice
-            
-            # [추가됨] 오디오 설정 저장
-            users[username]["audio_language"] = audio_lang
-            users[username]["audio_model_level"] = int(audio_model)
-            
-            AuthManager.save_users(users)
-            return True
-        return False
+    def update_user_settings(username, api_key, model_choice, audio_lang="auto", audio_model=2, custom_prompt=None):
+        # DB 업데이트 ($set 연산자 사용)
+        update_data = {
+            "openai_api_key": api_key,
+            "preferred_model": model_choice,
+            "audio_language": audio_lang,
+            "audio_model_level": int(audio_model)
+        }
+        
+        # 프롬프트가 None이 아닐 때만 업데이트 (빈 문자열이어도 업데이트)
+        if custom_prompt is not None:
+            update_data["custom_prompt"] = custom_prompt
+
+        result = users_col.update_one(
+            {"username": username},
+            {"$set": update_data}
+        )
+        return result.matched_count > 0
 
     @staticmethod
     def get_user_settings(username):
-        users = AuthManager.load_users()
-        user = users.get(username, {})
+        user = users_col.find_one({"username": username})
+        
+        # 기본 프롬프트 정의
+        default_prompt = """당신은 전공 강의 자료를 분석하고 요약하는 전문 AI 조교입니다.
+[출력 규칙]
+1. **반드시 Markdown 형식**으로 작성
+2. **한국어** 사용
+3. 서론 없이 본론만 바로 작성"""
+
+        if user:
+            return {
+                "openai_api_key": user.get("openai_api_key", ""),
+                "preferred_model": user.get("preferred_model", "local"),
+                "audio_language": user.get("audio_language", "auto"),
+                "audio_model_level": user.get("audio_model_level", 2),
+                # 저장된 프롬프트가 없으면 기본값 반환
+                "custom_prompt": user.get("custom_prompt", default_prompt)
+            }
+        
         return {
-            "openai_api_key": user.get("openai_api_key", ""),
-            "preferred_model": user.get("preferred_model", "local"),
-            
-            # [추가됨] 오디오 설정 (기본값: auto, level 2)
-            "audio_language": user.get("audio_language", "auto"),
-            "audio_model_level": user.get("audio_model_level", 2)
+            "openai_api_key": "",
+            "preferred_model": "local",
+            "audio_language": "auto",
+            "audio_model_level": 2,
+            "custom_prompt": default_prompt
         }

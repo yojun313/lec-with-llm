@@ -24,7 +24,7 @@
             </a>
             <a href="/viewer" class="flex items-center px-4 py-3 text-gray-400 hover:bg-gray-800 hover:text-white rounded-lg transition">
                 <i class="fas fa-book-open w-6"></i>
-                <span>Knowledge</span>
+                <span>Viewer</span>
             </a>
             
             <a href="/settings" class="flex items-center px-4 py-3 bg-gray-800 text-blue-400 rounded-lg">
@@ -56,12 +56,32 @@
                 </div>
 
                 <div id="apiKeySection" class="hidden">
-                    <label class="block text-sm font-bold mb-2 text-gray-300">OpenAI API Key</label>
+                    <div class="flex justify-between items-end mb-2">
+                        <label class="block text-sm font-bold text-gray-300">OpenAI API Key</label>
+                        <a href="/guide/openai" target="_blank" class="text-xs text-blue-400 hover:text-blue-300 underline flex items-center">
+                            <i class="far fa-question-circle mr-1"></i> 발급 방법 가이드
+                        </a>
+                    </div>
                     <input type="password" name="api_key" id="apiKeyInput" placeholder="sk-..." 
                            class="w-full p-3 rounded bg-gray-700 border border-gray-600 focus:border-blue-500 outline-none">
                     <p class="text-xs text-gray-500 mt-2">키는 서버에 안전하게 저장되며, OpenAI 모델 선택 시에만 사용됩니다.</p>
                 </div>
 
+                <hr class="border-gray-700 my-6">
+
+                <div>
+                    <div class="flex justify-between items-center mb-2">
+                        <label class="block text-sm font-bold text-gray-300">System Prompt (AI 지시문)</label>
+                        <button type="button" onclick="resetPrompt()" class="text-xs text-blue-400 hover:text-blue-300 underline">
+                            기본값 복원
+                        </button>
+                    </div>
+                    <textarea name="custom_prompt" id="customPrompt" rows="6" 
+                        class="w-full p-3 rounded bg-gray-700 border border-gray-600 focus:border-blue-500 outline-none text-sm leading-relaxed"
+                        placeholder="AI에게 내릴 지시사항을 입력하세요..."></textarea>
+                    <p class="text-xs text-gray-500 mt-2">슬라이드 분석 시 AI에게 전달될 역할을 정의합니다.</p>
+                </div>
+                
                 <hr class="border-gray-700 my-6">
                 
                 <h3 class="text-xl font-bold mb-4 text-green-400">오디오 설정 (STT)</h3>
@@ -92,7 +112,6 @@
                         <option value="th">태국어 (Thai)</option>
                         <option value="id">인도네시아어 (Indonesian)</option>
                     </select>
-                    <p class="text-xs text-gray-500 mt-2">분석할 오디오의 언어를 선택해주세요.</p>
                 </div>
 
                 <div class="pt-6">
@@ -105,23 +124,27 @@
     </main>
 
     <script>
-        // 서버에서 전달받은 기존 설정 적용
+        // 서버에서 전달받은 기존 설정 적용 (Template Engine)
         const currentModel = "{{ settings.preferred_model }}";
         const currentKey = "{{ settings.openai_api_key }}";
         const currentAudioLang = "{{ settings.audio_language }}";
         const currentAudioModel = "{{ settings.audio_model_level }}";
+        
+        // [추가] 줄바꿈 문자가 자바스크립트 에러를 일으키지 않도록 이스케이프 처리
+        const currentPrompt = `{{ settings.custom_prompt | safe }}`;
 
         const modelSelect = document.getElementById('modelSelect');
         const apiKeySection = document.getElementById('apiKeySection');
         const apiKeyInput = document.getElementById('apiKeyInput');
         const audioLangSelect = document.getElementById('audioLangSelect');
         const audioModelSelect = document.getElementById('audioModelSelect');
+        const customPrompt = document.getElementById('customPrompt');
 
         // 초기값 세팅
         modelSelect.value = currentModel || 'local';
         apiKeyInput.value = currentKey || '';
+        customPrompt.value = currentPrompt;
         
-        // 기존 설정에 'auto'가 저장되어 있다면 강제로 'ko'로 변경 (오류 방지)
         if (currentAudioLang === 'auto' || !currentAudioLang) {
             audioLangSelect.value = 'ko'; 
         } else {
@@ -143,6 +166,16 @@
                 apiKeySection.classList.add('hidden');
                 apiKeyInput.removeAttribute('required');
             }
+        }
+
+        // [추가] 기본 프롬프트 복원 함수
+        function resetPrompt() {
+            const defaultPrompt = `당신은 전공 강의 자료를 분석하고 요약하는 전문 AI 조교입니다.
+[출력 규칙]
+1. **반드시 Markdown 형식**으로 작성
+2. **한국어** 사용
+3. 서론 없이 본론만 바로 작성`;
+            customPrompt.value = defaultPrompt;
         }
 
         // 저장 요청

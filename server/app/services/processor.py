@@ -1,0 +1,298 @@
+import os
+import shutil
+import base64
+import requests
+import subprocess
+import zipfile
+import pdfkit
+import threading
+from pdf2image import convert_from_path
+from app.core.config import settings
+from app.services.job_manager import JobManager
+from app.services.auth_manager import AuthManager
+
+# ==========================================
+# Global Lock
+# ==========================================
+# 한 번에 하나의 작업만 처리하기 위한 Lock 객체
+task_lock = threading.Lock()
+
+# ==========================================
+# Helper Functions
+# ==========================================
+
+def get_headers(api_key=None):
+    """
+    api_key가 있으면(사용자 설정) 그것을 사용하고,
+    없으면 서버 기본 설정(Local Server 토큰)을 사용합니다.
+    """
+    if api_key:
+        return {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        }
+    
+    # 로컬 서버용 토큰
+    return {
+        "Authorization": f"Bearer {settings.CUSTOM_TOKEN}",
+        "Content-Type": "application/json",
+    }
+
+def get_target_model(user_settings):
+    """
+    사용자 설정에 따라 모델 ID와 Base URL, API Key를 결정합니다.
+    """
+    pref = user_settings.get("preferred_model", "local")
+    user_key = user_settings.get("openai_api_key", "")
+
+    # 1. OpenAI 모드
+    if pref.startswith("gpt"):
+        if not user_key:
+            raise ValueError("OpenAI 모델이 선택되었으나 API Key가 설정되지 않았습니다.")
+        
+        return {
+            "provider": "openai",
+            "model_id": pref, # gpt-4o, gpt-4-turbo 등
+            "base_url": "https://api.openai.com/v1",
+            "api_key": user_key
+        }
+
+    # 2. Local Server 모드
+    else:
+        # 로컬 서버에서 모델 ID 조회
+        try:
+            url = f"{settings.CUSTOM_BASE_URL}/models"
+            resp = requests.get(url, headers=get_headers(), timeout=5)
+            resp.raise_for_status()
+            models = resp.json().get("data", [])
+            if not models:
+                raise RuntimeError("로컬 서버에 사용 가능한 모델이 없습니다.")
+            found_id = models[0]["id"]
+            
+            return {
+                "provider": "local",
+                "model_id": found_id,
+                "base_url": settings.CUSTOM_BASE_URL,
+                "api_key": None # 로컬은 헤더 생성시 CUSTOM_TOKEN 사용
+            }
+        except Exception as e:
+            print(f"[WARN] Local model fetch failed: {e}")
+            # 실패 시 기본값 (환경변수 fallback)
+            return {
+                "provider": "local",
+                "model_id": settings.OPENAI_MODEL or "gpt-4o",
+                "base_url": settings.CUSTOM_BASE_URL,
+                "api_key": None
+            }
+
+def describe_image(image_path: str, model_config: dict):
+    filename = os.path.basename(image_path)
+    
+    # 설정된 URL과 Key 사용
+    url = f"{model_config['base_url']}/chat/completions"
+    headers = get_headers(model_config['api_key'])
+
+    def image_to_data_url(path):
+        with open(path, "rb") as f:
+            raw = f.read()
+        encoded = base64.b64encode(raw).decode("utf-8")
+        ext = os.path.splitext(path)[1].lower()
+        mime = "image/png" if ext == ".png" else "image/jpeg"
+        return f"data:{mime};base64,{encoded}"
+
+    payload = {
+        "model": model_config['model_id'],
+        "messages": [
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": f"""
+                            이 이미지는 전공 PPT 슬라이드 한 장이다.
+                            이 슬라이드를 분석하여 Markdown 문서에 들어갈 설명을 작성하라.
+
+                            출력 규칙:
+                            - 반드시 Markdown 형식
+                            - 제목은 "## {filename}" 형식
+                            - 한국어 사용
+                            - 인사말, 메타 설명, 이모티콘 금지
+                            - 코드 블록 금지
+
+                            포함할 내용:
+                            - 슬라이드 주제
+                            - 그림 / 도표 설명
+                            - 전공 관점에서의 매우 자세한 설명
+                        """.strip()
+                    },
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": image_to_data_url(image_path)
+                        }
+                    }
+                ],
+            }
+        ],
+        "max_tokens": 1600,
+    }
+
+    resp = requests.post(url, headers=headers, json=payload, timeout=120)
+    
+    if resp.status_code != 200:
+        print(f"[ERROR] LLM Request Failed: {resp.text}")
+        raise RuntimeError(f"LLM Error: {resp.text}")
+    
+    return resp.json()["choices"][0]["message"]["content"]
+
+def convert_ppt_to_pdf(ppt_path: str, output_dir: str):
+    subprocess.run(
+        ["soffice", "--headless", "--convert-to", "pdf", "--outdir", output_dir, ppt_path],
+        check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+    )
+    base = os.path.splitext(os.path.basename(ppt_path))[0]
+    return os.path.join(output_dir, f"{base}.pdf")
+
+# ==========================================
+# Main Task (With Lock)
+# ==========================================
+
+def process_file_task(job_id: str, file_path: str):
+    
+    # 0. 작업 소유자 확인 및 설정 로드
+    job = JobManager.get_job(job_id)
+    if not job:
+        return
+    
+    owner = job.get("owner")
+    user_settings = AuthManager.get_user_settings(owner)
+    
+    # 대기열 로깅
+    try:
+        queue_pos = JobManager.get_queue_position(job_id)
+        if queue_pos > 0:
+            JobManager.update_progress(job_id, 0, 0, f"대기열 진입: 앞선 작업 {queue_pos}개 대기 중")
+        else:
+            JobManager.update_progress(job_id, 0, 0, "작업 준비 중...")
+    except: pass
+
+    # 1. Lock 획득 시도 (여기서 대기 발생)
+    with task_lock:
+        work_dir = os.path.join(settings.UPLOAD_DIR, job_id)
+        os.makedirs(work_dir, exist_ok=True)
+        
+        try:
+            # [상태 변경] 락을 얻었으므로 Processing으로 변경
+            JobManager.start_processing(job_id)
+            JobManager.update_progress(job_id, 0, 0, "작업 시작! (리소스 할당됨)")
+            
+            # [모델 결정] 사용자 설정에 따라
+            try:
+                model_config = get_target_model(user_settings)
+                JobManager.update_progress(job_id, 0, 0, f"모델 연결: {model_config['model_id']} ({model_config['provider']})")
+            except Exception as e:
+                raise RuntimeError(f"모델 설정 오류: {str(e)}")
+
+            # 2. 파일 변환
+            images = []
+            ext = os.path.splitext(file_path)[1].lower()
+            
+            if ext == ".pdf":
+                JobManager.update_progress(job_id, 0, 0, "PDF 페이지 추출 중...")
+                raw_images = convert_from_path(file_path, fmt="png", dpi=150)
+                for i, img in enumerate(raw_images):
+                    p = os.path.join(work_dir, f"page_{i:03d}.png")
+                    img.save(p)
+                    images.append(p)
+
+            elif ext in [".ppt", ".pptx"]:
+                JobManager.update_progress(job_id, 0, 0, "PPT -> PDF 변환 중...")
+                pdf_path = convert_ppt_to_pdf(file_path, work_dir)
+                raw_images = convert_from_path(pdf_path, fmt="png", dpi=150)
+                for i, img in enumerate(raw_images):
+                    p = os.path.join(work_dir, f"page_{i:03d}.png")
+                    img.save(p)
+                    images.append(p)
+            
+            else:
+                raise ValueError("지원하지 않는 파일 형식입니다.")
+
+            # 3. 결과 폴더 준비
+            result_base = os.path.join(settings.RESULT_DIR, job_id)
+            result_images_dir = os.path.join(result_base, "images")
+            os.makedirs(result_images_dir, exist_ok=True)
+
+            total_pages = len(images)
+            JobManager.update_progress(job_id, 0, total_pages, f"총 {total_pages}장 이미지 분석 시작")
+
+            md_content = f"# Presentation Analysis\n\n"
+            
+            # 4. LLM 분석 루프
+            for idx, img_path in enumerate(images, 1):
+                JobManager.update_progress(job_id, idx, total_pages, f"슬라이드 {idx}/{total_pages} 분석 중...")
+                
+                img_filename = os.path.basename(img_path)
+                dst_img_path = os.path.join(result_images_dir, img_filename)
+                shutil.copy2(img_path, dst_img_path)
+
+                # 결정된 모델 설정(model_config)으로 호출
+                desc = describe_image(img_path, model_config)
+                
+                md_content += f"## Slide {idx}\n\n"
+                md_content += f"![{img_filename}](./images/{img_filename})\n\n"
+                md_content += f"{desc}\n\n---\n\n"
+
+            # 5. 문서 생성
+            JobManager.update_progress(job_id, total_pages, total_pages, "PDF 문서 생성 중...")
+            
+            md_file = os.path.join(result_base, "result.md")
+            pdf_file = os.path.join(result_base, "result.pdf")
+            
+            with open(md_file, "w", encoding="utf-8") as f:
+                f.write(md_content)
+                
+            import markdown
+            html = markdown.markdown(md_content)
+            
+            abs_result_base = os.path.abspath(result_base)
+            if os.name == 'nt':
+                 base_href = f"file:///{abs_result_base.replace(os.sep, '/')}/"
+            else:
+                 base_href = f"file://{abs_result_base}/"
+
+            html_content = f"""
+            <html>
+            <head>
+                <meta charset="utf-8">
+                <base href="{base_href}">
+                <style>
+                    body {{ font-family: sans-serif; line-height: 1.6; padding: 20px; }}
+                    img {{ max-width: 100%; height: auto; display: block; margin: 20px 0; border: 1px solid #ccc; }}
+                    h1, h2 {{ color: #333; page-break-before: always; }}
+                    h1:first-child {{ page-break-before: auto; }}
+                </style>
+            </head>
+            <body>
+            {html}
+            </body>
+            </html>
+            """
+            
+            options = {"quiet": "", "encoding": "UTF-8", "enable-local-file-access": ""}
+            pdfkit.from_string(html_content, pdf_file, options=options)
+
+            # 6. 압축 및 완료 처리
+            JobManager.update_progress(job_id, total_pages, total_pages, "결과물 압축 중...")
+            
+            zip_output_path = os.path.join(settings.RESULT_DIR, job_id)
+            shutil.make_archive(zip_output_path, 'zip', result_base)
+
+            rel_path = f"/static/results/{job_id}.zip"
+            JobManager.mark_completed(job_id, rel_path)
+
+        except Exception as e:
+            print(f"[CRITICAL ERROR] {e}")
+            JobManager.mark_failed(job_id, str(e))
+        finally:
+            if os.path.exists(work_dir):
+                shutil.rmtree(work_dir)

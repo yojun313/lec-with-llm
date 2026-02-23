@@ -211,3 +211,5 @@ ppt_result/
 audio_data/
 audio_result/
 
+users.json
+history.json

@@ -292,8 +292,31 @@ def process_input_file(input_path: str, model_id: str, merge_mode: bool, export_
     md_fp = open(merged_md_path, "w", encoding="utf-8") if merge_mode else None
     md_land_fp = open(merged_md_landscape_path, "w", encoding="utf-8") if merge_mode else None
 
+    page_break_css = """
+<style>
+.page-container {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    page-break-after: always !important;
+    display: block;
+    width: 100%;
+    overflow: hidden;
+}
+img {
+    max-height: 45vh;
+    width: auto;
+    object-fit: contain;
+    display: block;
+    margin: 0 auto;
+}
+</style>
+"""
+
     if merge_mode:
+        md_fp.write(page_break_css + "\n")
         md_fp.write(f"# {base_name}\n\n")
+        
+        md_land_fp.write(page_break_css + "\n")
         md_land_fp.write(f"# {base_name}\n\n")
 
     with tempfile.TemporaryDirectory() as tmp:
@@ -322,11 +345,10 @@ def process_input_file(input_path: str, model_id: str, merge_mode: bool, export_
                 try:
                     text = describe_image(model_id, img_path)
                 except Exception as e:
-                    console.print(f"[red]Failed:[/red] {fname} → {e}")
+                    console.print(f"[red]Failed:[/red] {fname} -> {e}")
                     progress.advance(task)
                     continue
 
-                # copy image
                 dst_img = os.path.join(images_dir, fname)
                 with open(img_path, "rb") as src, open(dst_img, "wb") as dst:
                     dst.write(src.read())
@@ -334,20 +356,17 @@ def process_input_file(input_path: str, model_id: str, merge_mode: bool, export_
                 rel_img = "./images/" + urllib.parse.quote(fname)
 
                 if merge_mode:
-                    # 공통 제목
-                    md_fp.write(f"## {fname}\n\n")
-                    md_land_fp.write(f"## {fname}\n\n")
-
-                    # 세로용(기존 유지): 이미지 위, 설명 아래
-                    md_fp.write(f"![{fname}]({rel_img})\n\n")
-
                     stripped = text.strip()
                     if stripped.startswith(f"## {fname}"):
                         stripped = stripped[len(f"## {fname}"):].lstrip()
 
-                    md_fp.write(stripped + "\n\n---\n\n")
+                    md_fp.write("::: page-container\n")
+                    md_fp.write(f"## {fname}\n\n")
+                    md_fp.write(f"![{fname}]({rel_img})\n\n")
+                    md_fp.write(stripped + "\n")
+                    md_fp.write(":::\n\n")
 
-                    # 가로용: fenced div(HTML 태그 아님, pandoc 확장 마크다운)
+                    md_land_fp.write("::: page-container\n")
                     md_land_fp.write("::: slide-row\n")
                     md_land_fp.write("::: slide-img\n")
                     md_land_fp.write(f"![{fname}]({rel_img})\n")
@@ -355,7 +374,8 @@ def process_input_file(input_path: str, model_id: str, merge_mode: bool, export_
                     md_land_fp.write("::: slide-desc\n")
                     md_land_fp.write(stripped + "\n")
                     md_land_fp.write(":::\n")
-                    md_land_fp.write(":::\n\n---\n\n")
+                    md_land_fp.write(":::\n")
+                    md_land_fp.write(":::\n\n")
 
                 else:
                     md_path = os.path.join(output_dir, f"{os.path.splitext(fname)[0]}.md")
@@ -369,12 +389,10 @@ def process_input_file(input_path: str, model_id: str, merge_mode: bool, export_
         md_land_fp.close()
 
         if export_pdf_flag:
-            # 세로 PDF
             pdf_path_vertical = os.path.join(output_dir, f"{base_name}_v.pdf")
             export_pdf(merged_md_path, pdf_path_vertical, layout="vertical")
             console.print(f"[green]PDF generated:[/green] {pdf_path_vertical}")
 
-            # 가로(좌/우) PDF
             pdf_path_landscape = os.path.join(output_dir, f"{base_name}_h.pdf")
             export_pdf(merged_md_landscape_path, pdf_path_landscape, layout="landscape")
             console.print(f"[green]PDF generated:[/green] {pdf_path_landscape}")
@@ -383,7 +401,6 @@ def process_input_file(input_path: str, model_id: str, merge_mode: bool, export_
                 os.remove(merged_md_landscape_path)
             except OSError:
                 pass
-
 
 
 # =============================

@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI PPT Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        dark: '#0f172a',
+                        card: '#1e293b',
+                        sidebar: '#111827'
+                    }
+                }
+            }
+        }
+    </script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        /* 스크롤바 커스텀 */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #1e293b; }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #64748b; }
+    </style>
+</head>
+<body class="bg-dark text-white font-sans h-screen flex overflow-hidden">
+
+    <aside class="w-64 bg-sidebar border-r border-gray-800 flex flex-col hidden md:flex">
+        <div class="p-6">
+            <h1 class="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-500">
+                PPT AI
+            </h1>
+            <p class="text-sm text-gray-400 mt-2">User: <span class="text-white font-bold">{{ username }}</span></p>
+        </div>
+        <nav class="flex-1 px-4 space-y-2">
+            <a href="/" class="flex items-center px-4 py-3 bg-gray-800 text-blue-400 rounded-lg">
+                <i class="fas fa-columns w-6"></i>
+                <span class="font-medium">Dashboard</span>
+            </a>
+            <a href="/logout" class="flex items-center px-4 py-3 text-red-400 hover:bg-gray-800 hover:text-red-300 rounded-lg transition mt-10">
+                <i class="fas fa-sign-out-alt w-6"></i>
+                <span>Logout</span>
+            </a>
+            <a href="/settings" class="flex items-center px-4 py-3 text-gray-400 hover:bg-gray-800 hover:text-white rounded-lg transition">
+                <i class="fas fa-cog w-6"></i>
+                <span>Settings</span>
+            </a>
+        </nav>
+        </aside>
+
+    <main class="flex-1 flex flex-col min-w-0">
+        <header class="h-16 bg-card border-b border-gray-800 flex items-center justify-between px-8">
+            <h2 class="text-lg font-semibold text-gray-200">Processing Dashboard</h2>
+            <div class="flex items-center space-x-4">
+                <span class="text-sm text-gray-400" id="clock">00:00:00</span>
+                <div class="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-500"></div>
+            </div>
+        </header>
+
+        <div class="flex-1 overflow-y-auto p-8">
+            
+            <div class="mb-8">
+                <div id="drop-zone" class="bg-card border-2 border-dashed border-gray-700 rounded-xl p-10 text-center transition hover:border-blue-500 hover:bg-gray-800 cursor-pointer group">
+                    <input type="file" id="file-input" class="hidden" multiple accept=".ppt,.pptx,.pdf,.zip">
+                    <div class="pointer-events-none">
+                        <i class="fas fa-cloud-upload-alt text-5xl text-gray-600 group-hover:text-blue-500 mb-4 transition"></i>
+                        <h3 class="text-xl font-bold text-gray-300 group-hover:text-white">파일 업로드</h3>
+                        <p class="text-gray-500 mt-2">클릭하거나 파일을 여기에 드래그하세요 (다중 선택 가능)</p>
+                        <p class="text-xs text-gray-600 mt-1">지원: PPT, PPTX, PDF</p>
+                    </div>
+                </div>
+            </div>
+
+            <div>
+                <h3 class="text-xl font-bold mb-4 flex items-center">
+                    <i class="fas fa-tasks mr-2 text-blue-400"></i> 작업 목록
+                </h3>
+                <div id="job-container" class="grid grid-cols-1 gap-4">
+                    <div class="text-center text-gray-500 py-10 hidden" id="empty-state">
+                        작업 내역이 없습니다.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <template id="job-card-template">
+        <div class="bg-card border border-gray-700 rounded-lg p-5 shadow-lg relative overflow-hidden transition hover:border-gray-600">
+            
+            <button class="delete-btn absolute top-3 right-3 text-gray-500 hover:text-red-500 transition z-10" title="기록 삭제">
+                <i class="fas fa-times"></i>
+            </button>
+
+            <div class="flex justify-between items-start mb-4 pr-8">
+                <div class="flex items-center space-x-3 overflow-hidden">
+                    <div class="icon-box w-10 h-10 rounded-lg bg-gray-700 flex items-center justify-center flex-shrink-0 text-xl">
+                        </div>
+                    <div>
+                        <h4 class="font-bold text-gray-200 truncate max-w-xs filename">Filename.pptx</h4>
+                        <p class="text-xs text-gray-500 job-id font-mono">ID: ...</p>
+                    </div>
+                </div>
+                <div class="status-badge px-3 py-1 rounded-full text-xs font-bold uppercase bg-gray-700 text-gray-300">
+                    Pending
+                </div>
+            </div>
+
+            <div class="w-full bg-gray-800 rounded-full h-2 mb-2">
+                <div class="progress-bar bg-blue-600 h-2 rounded-full transition-all duration-500" style="width: 0%"></div>
+            </div>
+            <div class="flex justify-between text-xs text-gray-400 mb-4">
+                <span class="progress-text">준비 중...</span>
+                <span class="percent-text">0%</span>
+            </div>
+
+            <div class="flex items-center justify-between border-t border-gray-700 pt-3 mt-3">
+                <button class="text-xs text-gray-500 hover:text-white toggle-log-btn">
+                    <i class="fas fa-terminal mr-1"></i> 로그 보기
+                </button>
+                <a href="#" target="_blank" class="download-btn hidden bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded text-xs font-bold transition">
+                    <i class="fas fa-file-archive mr-1"></i> 전체 다운로드 (.zip)
+                </a>
+            </div>
+
+            <div class="log-area hidden mt-3 bg-black rounded p-3 h-32 overflow-y-auto text-xs font-mono text-green-400 border border-gray-800">
+            </div>
+        </div>
+    </template>
+
+    <script>
+        const dropZone = document.getElementById('drop-zone');
+        const fileInput = document.getElementById('file-input');
+        const jobContainer = document.getElementById('job-container');
+        const emptyState = document.getElementById('empty-state');
+        const template = document.getElementById('job-card-template');
+
+        let isPolling = false;
+
+        // --- 초기화 ---
+        updateClock();
+        setInterval(updateClock, 1000);
+        fetchJobs(); // 페이지 로드시 기존 작업 불러오기
+        startPolling(); // 폴링 시작
+
+        // --- 이벤트 리스너 ---
+        dropZone.addEventListener('click', () => fileInput.click());
+        
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('border-blue-500', 'bg-gray-800');
+        });
+
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('border-blue-500', 'bg-gray-800');
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('border-blue-500', 'bg-gray-800');
+            handleFiles(e.dataTransfer.files);
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            handleFiles(e.target.files);
+            fileInput.value = ''; // 초기화
+        });
+
+        // --- 파일 업로드 처리 ---
+        async function handleFiles(files) {
+            if (files.length === 0) return;
+
+            for (const file of files) {
+                await uploadSingleFile(file);
+            }
+        }
+
+        async function uploadSingleFile(file) {
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                const res = await fetch('/api/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (!res.ok) throw new Error('Upload failed');
+                
+                // 업로드 성공 시 즉시 목록 갱신
+                fetchJobs();
+
+            } catch (err) {
+                alert(`"${file.name}" 업로드 실패: ${err.message}`);
+            }
+        }
+
+        // --- 데이터 폴링 및 렌더링 ---
+        function startPolling() {
+            if (isPolling) return;
+            isPolling = true;
+            setInterval(fetchJobs, 2000); 
+        }
+
+        async function fetchJobs() {
+            try {
+                const res = await fetch('/api/jobs');
+                const jobs = await res.json();
+
+                if (jobs.length === 0) {
+                    emptyState.classList.remove('hidden');
+                } else {
+                    emptyState.classList.add('hidden');
+                    updateDashboard(jobs);
+                }
+            } catch (err) {
+                console.error("Failed to fetch jobs:", err);
+            }
+        }
+
+        function updateDashboard(jobs) {
+            // 현재 존재하는 카드 확인을 위한 Set
+            const existingIds = new Set();
+            
+            // 1. 순서대로 카드 배치 (DOM 순서 맞추기)
+            jobs.forEach((job, index) => {
+                existingIds.add(`job-${job.id}`);
+                let card = document.getElementById(`job-${job.id}`);
+                
+                if (!card) {
+                    // 새 카드 생성
+                    card = createCard(job);
+                    // 순서에 맞게 삽입 (최신순 정렬되어 오므로 prepend 사용)
+                    // 다만 forEach가 최신순(0번 인덱스가 최신)으로 온다면:
+                    if (index === 0) {
+                        jobContainer.prepend(card);
+                    } else {
+                        // 이전 요소 뒤에 삽입
+                        const prevId = jobs[index-1].id;
+                        const prevCard = document.getElementById(`job-${prevId}`);
+                        if (prevCard) {
+                            prevCard.after(card);
+                        } else {
+                            jobContainer.appendChild(card);
+                        }
+                    }
+                }
+                
+                updateCardData(card, job);
+            });
+
+            // 2. 삭제된 작업 카드 제거 (서버에는 없는데 화면에만 있는 경우)
+            const allCards = jobContainer.querySelectorAll('div[id^="job-"]');
+            allCards.forEach(card => {
+                if (!existingIds.has(card.id)) {
+                    card.remove();
+                }
+            });
+            
+            if (jobs.length === 0) emptyState.classList.remove('hidden');
+        }
+
+        function createCard(job) {
+            const clone = template.content.cloneNode(true);
+            const cardDiv = clone.querySelector('div');
+            cardDiv.id = `job-${job.id}`;
+
+            // 기본 정보
+            clone.querySelector('.filename').textContent = job.filename;
+            clone.querySelector('.job-id').textContent = `ID: ${job.id.substring(0, 8)}...`;
+            
+            // 아이콘 설정
+            const iconBox = clone.querySelector('.icon-box');
+            if (job.filename.toLowerCase().endsWith('.pdf')) {
+                iconBox.innerHTML = '<i class="fas fa-file-pdf text-red-400"></i>';
+            } else if (job.filename.toLowerCase().endsWith('.zip')) {
+                iconBox.innerHTML = '<i class="fas fa-file-archive text-yellow-400"></i>';
+            } else {
+                iconBox.innerHTML = '<i class="fas fa-file-powerpoint text-orange-400"></i>';
+            }
+
+            // 로그 토글 이벤트
+            const logBtn = clone.querySelector('.toggle-log-btn');
+            const logArea = clone.querySelector('.log-area');
+            logBtn.addEventListener('click', () => {
+                logArea.classList.toggle('hidden');
+            });
+
+            // 삭제 버튼 이벤트 연결
+            const deleteBtn = clone.querySelector('.delete-btn');
+            deleteBtn.addEventListener('click', async () => {
+                if (!confirm('정말 이 작업 기록을 삭제하시겠습니까?')) return;
+                
+                try {
+                    const res = await fetch(`/api/jobs/${job.id}`, { method: 'DELETE' });
+                    if (res.ok) {
+                        cardDiv.remove();
+                        // DOM에서 삭제 후 남은 카드가 없으면 emptyState 표시
+                        const remaining = jobContainer.querySelectorAll('div[id^="job-"]');
+                        if (remaining.length === 0) {
+                            emptyState.classList.remove('hidden');
+                        }
+                    } else {
+                        alert('삭제 실패');
+                    }
+                } catch (e) {
+                    console.error(e);
+                    alert('오류 발생');
+                }
+            });
+
+            return cardDiv;
+        }
+
+        function updateCardData(card, job) {
+            const badge = card.querySelector('.status-badge');
+            const progressBar = card.querySelector('.progress-bar');
+            const progressText = card.querySelector('.progress-text');
+            const percentText = card.querySelector('.percent-text');
+            const downloadBtn = card.querySelector('.download-btn');
+            const logArea = card.querySelector('.log-area');
+
+            // --- 1. 상태별 디자인 및 텍스트 업데이트 ---
+            if (job.status === 'completed') {
+                // [완료됨]
+                badge.className = 'status-badge px-3 py-1 rounded-full text-xs font-bold uppercase bg-green-500/20 text-green-400 border border-green-500/50';
+                badge.textContent = 'Completed';
+                progressBar.className = 'progress-bar bg-green-500 h-2 rounded-full transition-all duration-500';
+                
+                // 다운로드 버튼 활성화
+                downloadBtn.classList.remove('hidden');
+                downloadBtn.href = job.result_url;
+                
+                // 원본 파일명.zip 으로 다운로드되도록 설정
+                const originalName = job.filename;
+                const nameBody = originalName.substring(0, originalName.lastIndexOf('.')) || originalName;
+                downloadBtn.setAttribute('download', `${nameBody}.zip`);
+
+            } else if (job.status === 'pending') {
+                // [대기 중] -> Waiting (노란색 + 반짝임 효과)
+                badge.className = 'status-badge px-3 py-1 rounded-full text-xs font-bold uppercase bg-yellow-500/20 text-yellow-400 border border-yellow-500/50';
+                badge.textContent = 'Waiting';
+                progressBar.className = 'progress-bar bg-yellow-600 h-2 rounded-full transition-all duration-500 animate-pulse';
+
+            } else if (job.status === 'processing') {
+                // [작업 중] -> Processing (파란색)
+                badge.className = 'status-badge px-3 py-1 rounded-full text-xs font-bold uppercase bg-blue-500/20 text-blue-400 border border-blue-500/50';
+                badge.textContent = 'Processing';
+                progressBar.className = 'progress-bar bg-blue-600 h-2 rounded-full transition-all duration-500';
+
+            } else if (job.status === 'failed') {
+                // [실패] -> Failed (빨간색)
+                badge.className = 'status-badge px-3 py-1 rounded-full text-xs font-bold uppercase bg-red-500/20 text-red-400 border border-red-500/50';
+                badge.textContent = 'Failed';
+                progressBar.className = 'progress-bar bg-red-500 h-2 rounded-full transition-all duration-500';
+            }
+
+            // --- 2. 진행률(%) 업데이트 ---
+            const percent = job.progress || 0;
+            progressBar.style.width = `${percent}%`;
+            percentText.textContent = `${percent}%`;
+
+            // --- 3. 로그 메시지 업데이트 ---
+            // 진행 상태 텍스트 (마지막 로그 한 줄 표시)
+            if (job.logs.length > 0) {
+                const lastLog = job.logs[job.logs.length - 1];
+                // 시간 정보([12:00:00])가 있으면 제거하고 메시지만 깔끔하게 표시
+                progressText.textContent = lastLog.includes(']') ? lastLog.substring(lastLog.indexOf(']') + 1).trim() : lastLog;
+            }
+
+            // 전체 로그 영역 (로그가 추가되었을 때만 갱신)
+            if (logArea.childElementCount !== job.logs.length) {
+                logArea.innerHTML = '';
+                job.logs.forEach(log => {
+                    const p = document.createElement('p');
+                    p.textContent = log;
+                    logArea.appendChild(p);
+                });
+                // 스크롤을 항상 최하단으로 유지
+                logArea.scrollTop = logArea.scrollHeight;
+            }
+        }
+
+        function updateClock() {
+            const now = new Date();
+            document.getElementById('clock').textContent = now.toLocaleTimeString('ko-KR');
+        }
+    </script>
+</body>
+</html>

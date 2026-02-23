@@ -81,7 +81,7 @@ def get_target_model(user_settings):
             # 실패 시 기본값 (환경변수 fallback)
             return {
                 "provider": "local",
-                "model_id": settings.OPENAI_MODEL or "gpt-4o",
+                "model_id": "gpt-4o",
                 "base_url": settings.CUSTOM_BASE_URL,
                 "api_key": None
             }

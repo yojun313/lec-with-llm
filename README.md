@@ -65,43 +65,7 @@ uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 
 Docker ensures that all system dependencies (LibreOffice, wkhtmltopdf, etc.) are correctly configured regardless of your host OS.
 
-### 1) Create Docker Files
-
-Ensure you have a `Dockerfile` and `docker-compose.yml` in your root directory.
-
-**Dockerfile:**
-
-```dockerfile
-FROM python:3.10-slim
-
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    libreoffice \
-    poppler-utils \
-    wkhtmltopdf \
-    ffmpeg \
-    fonts-nanum \
-    && apt-get clean && rm -rf /var/lib/apt/lists/*
-
-WORKDIR /app
-
-# Install Python requirements
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Copy source code
-COPY . .
-
-# Create necessary directories
-RUN mkdir -p static/uploads static/results static/docs
-
-EXPOSE 8000
-
-CMD ["python", "main.py"]
-
-```
-
-### 2) Run with Docker Compose
+### 1) Run with Docker Compose
 
 ```bash
 # Build and start the container

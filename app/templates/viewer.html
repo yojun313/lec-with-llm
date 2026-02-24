@@ -165,6 +165,20 @@
             </button>
 
             <div class="flex-1 flex justify-end items-center space-x-2" id="toolbar" style="display: none;">
+                <button id="copyImageBtn" onclick="copySlideImage()" class="hidden items-center justify-center w-8 h-8 mr-2 text-notion-muted hover:text-blue-400 bg-notion-hover border border-notion-border rounded transition" title="슬라이드 이미지 복사">
+                    <i class="far fa-copy" id="copyIcon"></i>
+                </button>
+
+                <div id="zoomControls" class="flex items-center bg-notion-hover rounded border border-notion-border mr-2 transition-opacity duration-200">
+                    <button onclick="adjustFontSize(-10)" class="px-3 py-1.5 text-notion-muted hover:text-white hover:bg-[#3a3a3a] border-r border-notion-border transition rounded-l" title="축소">
+                        <i class="fas fa-minus text-xs"></i>
+                    </button>
+                    <span id="zoomDisplay" class="px-3 text-xs font-mono text-notion-text min-w-[3.5rem] text-center select-none">100%</span>
+                    <button onclick="adjustFontSize(10)" class="px-3 py-1.5 text-notion-muted hover:text-white hover:bg-[#3a3a3a] transition rounded-r" title="확대">
+                        <i class="fas fa-plus text-xs"></i>
+                    </button>
+                </div>
+                
                 <button id="viewModeBtn" class="text-notion-text bg-notion-hover border border-notion-border px-3 py-1.5 rounded text-sm flex items-center gap-2 hover:bg-[#3a3a3a] transition shadow-sm">
                     <i class="fas fa-desktop"></i> <span>프레젠테이션 모드</span>
                 </button>
@@ -242,6 +256,7 @@
         let viewMode = 'presentation'; 
         let slidesData = []; 
         let currentSlideIndex = 0;
+        let currentFontSize = 100;
 
         // --- DOM Elements ---
         const nodeList = document.getElementById('nodeList');
@@ -277,13 +292,15 @@
         loadNodes(null);
         marked.setOptions({ breaks: true, gfm: true });
 
-        // ==========================================
-        // [추가] 사이드바 접기 로직
-        // ==========================================
         hideSidebarBtn.addEventListener('click', () => {
             body.classList.add('sidebar-closed');
             localStorage.setItem('sidebarClosed', 'true');
         });
+
+        const savedZoom = localStorage.getItem('presentationZoom');
+        if (savedZoom) {
+            currentFontSize = parseInt(savedZoom);
+        }
 
         openSidebarBtn.addEventListener('click', () => {
             // 데스크탑에서 닫혀있는 상태라면 펼치기
@@ -321,18 +338,72 @@
                 viewModeBtn.innerHTML = '<i class="fas fa-scroll"></i> <span>전체 스크롤 모드</span>';
                 scrollView.classList.add('hidden');
                 presentationView.classList.add('active');
+
+                zoomControls.classList.remove('hidden');
+                zoomControls.classList.add('flex');
+
+                copyImageBtn.classList.remove('hidden'); 
+                copyImageBtn.classList.add('flex');      
+                
+                applyFontSize(); // 저장된 크기 적용 
                 renderCurrentSlide();
             } else {
                 viewMode = 'scroll';
                 viewModeBtn.innerHTML = '<i class="fas fa-desktop"></i> <span>프레젠테이션 모드</span>';
                 presentationView.classList.remove('active');
                 scrollView.classList.remove('hidden');
+
+                zoomControls.classList.remove('flex');
+                zoomControls.classList.add('hidden');
+
+                copyImageBtn.classList.remove('flex');   
+                copyImageBtn.classList.add('hidden');    
             }
         });
 
         // ==========================================
         // 문서 열기 & 파싱
         // ==========================================
+        async function copySlideImage() {
+            const imgElement = document.getElementById('slideImage');
+            const copyIcon = document.getElementById('copyIcon');
+            const btn = document.getElementById('copyImageBtn');
+        
+            // 이미지가 없거나 숨겨져 있다면 중단
+            if (!imgElement || imgElement.classList.contains('hidden') || !imgElement.src) {
+                alert('복사할 이미지가 없습니다.');
+                return;
+            }
+        
+            try {
+                // 1. 이미지 데이터를 Blob으로 가져오기
+                const response = await fetch(imgElement.src);
+                const blob = await response.blob();
+        
+                // 2. 클립보드에 쓰기
+                await navigator.clipboard.write([
+                    new ClipboardItem({
+                        [blob.type]: blob
+                    })
+                ]);
+        
+                // 3. 성공 시 아이콘 변경 (V 표시)
+                const originalClass = copyIcon.className;
+                copyIcon.className = "fas fa-check text-green-400";
+                btn.classList.add("border-green-500/50");
+                
+                // 1.5초 뒤 원복
+                setTimeout(() => {
+                    copyIcon.className = "far fa-copy";
+                    btn.classList.remove("border-green-500/50");
+                }, 1500);
+        
+            } catch (err) {
+                console.error('이미지 복사 실패:', err);
+                alert('이미지 복사에 실패했습니다. (보안 컨텍스트 필요)');
+            }
+        }
+
         async function openDoc(node) {
             try {
                 const res = await fetch(`/api/docs/content/${node.id}`); 
@@ -348,15 +419,51 @@
 
                 renderFullMarkdown(currentNodeData.content);
                 parseSlides(currentNodeData.content);
+
+                applyFontSize();
                 
                 currentSlideIndex = 0;
                 viewMode = 'presentation';
+
+                const zoomControls = document.getElementById('zoomControls');
+                const copyImageBtn = document.getElementById('copyImageBtn');
+
+                if (zoomControls) {
+                    zoomControls.classList.remove('hidden');
+                    zoomControls.classList.add('flex');
+                }
+                if (copyImageBtn) {
+                    copyImageBtn.classList.remove('hidden');
+                    copyImageBtn.classList.add('flex');
+                }
+
                 viewModeBtn.innerHTML = '<i class="fas fa-scroll"></i> <span>전체 스크롤 모드</span>';
                 scrollView.classList.add('hidden');
                 presentationView.classList.add('active');
                 renderCurrentSlide();
 
             } catch (err) { console.error(err); alert("문서를 불러올 수 없습니다."); }
+        }
+
+        function adjustFontSize(delta) {
+            currentFontSize += delta;
+            // 최소 50% ~ 최대 200% 제한
+            if (currentFontSize < 50) currentFontSize = 50;
+            if (currentFontSize > 200) currentFontSize = 200;
+            
+            applyFontSize();
+        }
+
+        function applyFontSize() {
+            const slideText = document.getElementById('slideText');
+            const zoomDisplay = document.getElementById('zoomDisplay');
+            
+            // Tailwind Prose는 rem 단위이므로 퍼센트 조절 시 자연스럽게 스케일링됨
+            if (slideText) slideText.style.fontSize = `${currentFontSize}%`;
+            if (zoomDisplay) zoomDisplay.textContent = `${currentFontSize}%`;
+            
+            // 설정 저장
+            localStorage.setItem('presentationZoom', currentFontSize);
         }
 
         function renderFullMarkdown(content) {

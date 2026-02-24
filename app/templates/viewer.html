@@ -137,6 +137,53 @@
         body.fullscreen-mode #tabBar { display: none !important; }
         body.fullscreen-mode #exitFullscreenBtn { display: flex !important; }
         body.fullscreen-mode main { height: 100vh !important; }
+
+        /* --- Tree View Styles --- */
+        .tree-node {
+            user-select: none;
+        }
+        .tree-content {
+            display: flex;
+            align-items: center;
+            padding: 0.25rem 0.5rem;
+            cursor: pointer;
+            color: #e5e5e5;
+            transition: background-color 0.2s;
+            border-radius: 4px;
+        }
+        .tree-content:hover {
+            background-color: #2c2c2c;
+        }
+        .tree-content.active {
+            background-color: #374151; /* 선택된 파일 강조 */
+            color: #60a5fa; /* blue-400 */
+        }
+        .tree-arrow {
+            width: 1rem;
+            height: 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 0.25rem;
+            transition: transform 0.2s ease;
+            font-size: 0.7rem;
+            color: #a0a0a0;
+        }
+        .tree-arrow.expanded {
+            transform: rotate(90deg);
+        }
+        .tree-children {
+            display: none;
+            margin-left: 0.5rem;     /* 들여쓰기 가이드라인 */
+            border-left: 1px solid #333; /* 가이드라인 선 */
+        }
+        .tree-children.show {
+            display: block;
+        }
+        /* 폴더인데 자식이 없는 경우 등 화살표 숨김용 */
+        .invisible {
+            visibility: hidden;
+        }
     </style>
 </head>
 <body class="bg-notion-bg text-notion-text font-sans h-screen flex overflow-hidden relative">
@@ -174,10 +221,10 @@
             </button>
             <input type="file" id="zipInput" class="hidden" accept=".zip">
         </div>
-        <div class="px-4 py-2 text-xs font-mono text-notion-muted border-b border-notion-border truncate select-none flex items-center">
-            <i class="fas fa-terminal mr-2 opacity-50"></i> <span id="breadcrumb">/ root</span>
+        <div class="px-4 py-2 text-xs font-bold text-notion-muted uppercase tracking-wider mt-2 mb-1">
+            Explorer
         </div>
-        <div id="nodeList" class="flex-1 overflow-y-auto p-2 space-y-0.5 custom-scrollbar"></div>
+        <div id="nodeList" class="flex-1 overflow-y-auto px-2 pb-4 space-y-0.5 custom-scrollbar"></div>
     </aside>
 
     <main class="flex-1 flex flex-col h-full relative overflow-hidden bg-notion-bg min-w-0">
@@ -282,18 +329,21 @@
     </div>
 
     <script>
-        // --- 상태 변수 ---
-        let currentParentId = null;
-        let currentPath = [{id: null, name: 'root'}];
+        // ==========================================
+        // 1. Global State & Config
+        // ==========================================
         let viewMode = 'presentation'; 
         
-        // 탭 관리를 위한 변수
-        let openedTabs = []; // { id, name, content, slides:[], currentIndex:0, zoom:100, processedContent: '', mathMap: [] }
+        // 탭 상태
+        let openedTabs = []; 
         let activeTabId = null;
 
-        // --- DOM Elements ---
+        // 트리 뷰 상태
+        let expandedFolderIds = new Set(); // 펼쳐진 폴더 ID 저장
+        let activeFileId = null;           // 현재 선택된 파일 ID
+
+        // DOM Elements
         const nodeList = document.getElementById('nodeList');
-        const breadcrumb = document.getElementById('breadcrumb');
         const zipInput = document.getElementById('zipInput');
         const dragOverlay = document.getElementById('dragOverlay');
         const toolbar = document.getElementById('toolbar');
@@ -318,95 +368,197 @@
         const zoomDisplay = document.getElementById('zoomDisplay');
         const body = document.body;
 
-        // --- Init ---
+        // Markdown / MathJax Config
+        marked.setOptions({ breaks: true, gfm: true });
+
+        // ==========================================
+        // 2. Initialization
+        // ==========================================
+        
+        // 사이드바 상태 복구
         if (localStorage.getItem('sidebarClosed') === 'true') {
             body.classList.add('sidebar-closed');
         }
 
-        loadNodes(null);
-        marked.setOptions({ breaks: true, gfm: true });
+        // 트리 펼침 상태 복구
+        const savedExpanded = localStorage.getItem('viewer_expanded_folders');
+        if (savedExpanded) {
+            try {
+                expandedFolderIds = new Set(JSON.parse(savedExpanded));
+            } catch(e) { console.error(e); }
+        }
 
-        restoreSession();
-
-        // 이벤트 리스너 설정
-        hideSidebarBtn.addEventListener('click', () => {
-            body.classList.add('sidebar-closed');
-            localStorage.setItem('sidebarClosed', 'true');
-        });
-
-        openSidebarBtn.addEventListener('click', () => {
-            if (body.classList.contains('sidebar-closed')) {
-                body.classList.remove('sidebar-closed');
-                localStorage.setItem('sidebarClosed', 'false');
-            } else {
-                toggleSidebar(true);
-            }
-        });
+        // 초기 실행
+        loadTreeRoot();   // 트리 로드
+        restoreSession(); // 탭 세션 복구
 
         // ==========================================
-        // 드래그 앤 드롭
+        // 3. Tree View Logic (VS Code Style)
         // ==========================================
-        let dragCounter = 0;
-        body.addEventListener('dragenter', (e) => { e.preventDefault(); dragCounter++; dragOverlay.classList.add('active'); });
-        body.addEventListener('dragleave', (e) => { e.preventDefault(); dragCounter--; if (dragCounter === 0) dragOverlay.classList.remove('active'); });
-        body.addEventListener('dragover', (e) => { e.preventDefault(); });
-        body.addEventListener('drop', async (e) => {
-            e.preventDefault(); dragCounter = 0; dragOverlay.classList.remove('active');
-            if (e.dataTransfer.files.length > 0) {
-                const file = e.dataTransfer.files[0];
-                if (!file.name.toLowerCase().endsWith('.zip')) { alert('ZIP 파일만 가능합니다.'); return; }
-                await handleFileUpload(file);
-            }
-        });
 
-        // ==========================================
-        // 뷰 모드 전환
-        // ==========================================
-        viewModeBtn.addEventListener('click', () => {
-            if (viewMode === 'scroll') {
-                setViewMode('presentation');
-            } else {
-                setViewMode('scroll');
-            }
-        });
-
-        function setViewMode(mode) {
-            viewMode = mode;
-            const zoomControls = document.getElementById('zoomControls');
-            const copyImageBtn = document.getElementById('copyImageBtn');
-
-            if (mode === 'presentation') {
-                viewModeBtn.innerHTML = '<i class="fas fa-scroll"></i> <span>스크롤 모드</span>';
-                scrollView.classList.add('hidden');
-                presentationView.classList.add('active');
+        // 3-1. 루트 폴더 로드
+        async function loadTreeRoot() {
+            nodeList.innerHTML = ''; // 초기화
+            try {
+                const res = await fetch(`/api/docs/nodes?parent_id=root`);
+                if (!res.ok) throw new Error("Fetch failed");
+                const nodes = await res.json();
                 
-                zoomControls.classList.remove('hidden');
-                zoomControls.classList.add('flex');
-                copyImageBtn.classList.remove('hidden'); 
-                copyImageBtn.classList.add('flex');      
-                
-                if (activeTabId) {
-                    renderCurrentSlide();
-                    applyFontSize();
+                // 루트 레벨 렌더링 (Depth 0, ParentName 'root')
+                await renderTreeNodes(nodes, nodeList, 0, 'root');
+            } catch (err) {
+                console.error(err);
+                nodeList.innerHTML = '<div class="text-xs text-red-400 p-4">로드 실패</div>';
+            }
+        }
+
+        // 3-2. 노드 리스트 렌더링
+        async function renderTreeNodes(nodes, container, depth, parentName) {
+            // 폴더 우선 정렬 -> 이름 오름차순
+            nodes.sort((a, b) => {
+                if (a.type === b.type) return a.name.localeCompare(b.name);
+                return a.type === 'folder' ? -1 : 1;
+            });
+
+            for (const node of nodes) {
+                const nodeEl = createTreeNodeElement(node, depth, parentName);
+                container.appendChild(nodeEl);
+
+                // 이미 펼쳐진 상태라면 자식 로드
+                if (node.type === 'folder' && expandedFolderIds.has(node.id)) {
+                    const arrow = nodeEl.querySelector('.tree-arrow');
+                    const childrenContainer = nodeEl.querySelector('.tree-children');
+                    
+                    arrow.classList.add('expanded');
+                    childrenContainer.classList.add('show');
+                    
+                    // 자식 데이터 로드
+                    await loadFolderChildren(node.id, childrenContainer, depth + 1, node.name);
                 }
-            } else {
-                viewModeBtn.innerHTML = '<i class="fas fa-desktop"></i> <span>프레젠테이션 모드</span>';
-                presentationView.classList.remove('active');
-                scrollView.classList.remove('hidden');
+            }
+        }
 
-                zoomControls.classList.remove('flex');
-                zoomControls.classList.add('hidden');
-                copyImageBtn.classList.remove('flex');   
-                copyImageBtn.classList.add('hidden');    
+        // 3-3. 개별 노드 HTML 생성
+        function createTreeNodeElement(node, depth, parentName) {
+            const isFolder = node.type === 'folder';
+            const wrapper = document.createElement('div');
+            wrapper.className = 'tree-node';
+            
+            // 아이콘 결정
+            let iconClass = isFolder ? 'fas fa-folder text-yellow-500' : 'fas fa-file-lines text-blue-400';
+            if (isFolder && expandedFolderIds.has(node.id)) {
+                iconClass = 'fas fa-folder-open text-yellow-500';
+            }
+
+            // 들여쓰기 계산 (기본 0.5rem + depth * 0.8rem)
+            const paddingLeft = 0.5 + (depth * 0.8);
+
+            wrapper.innerHTML = `
+                <div class="tree-content group ${node.id === activeFileId ? 'active' : ''}" 
+                     style="padding-left: ${paddingLeft}rem"
+                     onclick="handleNodeClick(this, '${node.id}', '${node.type}', '${node.name.replace(/'/g, "\\'")}', '${parentName}')">
+                    
+                    <span class="tree-arrow ${isFolder ? '' : 'invisible'}">
+                        <i class="fas fa-chevron-right"></i>
+                    </span>
+                    
+                    <i class="${iconClass} mr-2 w-4 text-center opacity-80 node-icon"></i>
+                    <span class="truncate text-sm select-none flex-1">${node.name}</span>
+                    
+                    <div class="flex items-center space-x-1 opacity-0 group-hover:opacity-100 ml-2" onclick="event.stopPropagation()">
+                        ${!isFolder ? `
+                        <button onclick="downloadFile(event, '${node.id}')" class="text-notion-muted hover:text-green-400 p-1" title="다운로드">
+                            <i class="fas fa-download text-xs"></i>
+                        </button>` : ''}
+                        <button onclick="deleteNode(event, '${node.id}')" class="text-notion-muted hover:text-red-400 p-1" title="삭제">
+                            <i class="fas fa-trash-alt text-xs"></i>
+                        </button>
+                    </div>
+                </div>
+                ${isFolder ? `<div class="tree-children" id="children-${node.id}"></div>` : ''}
+            `;
+            
+            return wrapper;
+        }
+
+        // 3-4. 클릭 핸들러 (폴더 토글 / 파일 열기)
+        async function handleNodeClick(el, id, type, name, parentName) {
+            if (type === 'folder') {
+                const arrow = el.querySelector('.tree-arrow');
+                const icon = el.querySelector('.node-icon');
+                const childrenContainer = el.parentElement.querySelector('.tree-children');
+                
+                const isExpanded = expandedFolderIds.has(id);
+                
+                if (isExpanded) {
+                    // 접기
+                    expandedFolderIds.delete(id);
+                    arrow.classList.remove('expanded');
+                    childrenContainer.classList.remove('show');
+                    icon.className = 'fas fa-folder text-yellow-500 mr-2 w-4 text-center opacity-80 node-icon';
+                    childrenContainer.innerHTML = ''; // 내용 비우기 (메모리 관리)
+                } else {
+                    // 펼치기
+                    expandedFolderIds.add(id);
+                    arrow.classList.add('expanded');
+                    childrenContainer.classList.add('show');
+                    icon.className = 'fas fa-folder-open text-yellow-500 mr-2 w-4 text-center opacity-80 node-icon';
+                    
+                    // 자식 로드 (비어있을 때만)
+                    if (childrenContainer.children.length === 0) {
+                        // 현재 paddingLeft를 역산하여 depth 추정
+                        const currentPadding = parseFloat(el.style.paddingLeft);
+                        const currentDepth = Math.round((currentPadding - 0.5) / 0.8);
+                        
+                        childrenContainer.innerHTML = '<div class="text-xs text-notion-muted py-1 pl-8">로딩 중...</div>';
+                        await loadFolderChildren(id, childrenContainer, currentDepth + 1, name);
+                    }
+                }
+                
+                // 상태 저장
+                localStorage.setItem('viewer_expanded_folders', JSON.stringify([...expandedFolderIds]));
+
+            } else {
+                // 파일 클릭
+                // UI 활성화 처리
+                document.querySelectorAll('.tree-content').forEach(c => c.classList.remove('active'));
+                el.classList.add('active');
+                activeFileId = id;
+
+                // 탭 열기 (상위 폴더 이름 전달)
+                openDoc({ id, name }, 0, parentName);
+            }
+        }
+
+        // 3-5. 하위 폴더 데이터 로드
+        async function loadFolderChildren(parentId, container, depth, parentName) {
+            try {
+                const res = await fetch(`/api/docs/nodes?parent_id=${parentId}`);
+                if (!res.ok) throw new Error("Fetch failed");
+                const nodes = await res.json();
+                
+                container.innerHTML = ''; // 로딩 메시지 제거
+                
+                if (nodes.length === 0) {
+                    const paddingLeft = 0.5 + (depth * 0.8);
+                    container.innerHTML = `<div class="text-xs text-notion-muted py-1 select-none opacity-50" style="padding-left:${paddingLeft}rem">(비어 있음)</div>`;
+                    return;
+                }
+                
+                await renderTreeNodes(nodes, container, depth, parentName);
+                
+            } catch (err) {
+                console.error(err);
+                container.innerHTML = `<div class="text-xs text-red-400 py-1 pl-4">Error</div>`;
             }
         }
 
         // ==========================================
-        // 탭 및 문서 열기 로직 (Core Logic)
+        // 4. Tab & Document Logic
         // ==========================================
 
-        async function openDoc(node, initialIndex = 0) {
-            // 1. 이미 열려있는 탭인지 확인
+        async function openDoc(node, initialIndex = 0, parentName = 'root') {
+            // 이미 열려있는 탭 확인
             const existingTab = openedTabs.find(tab => tab.id === node.id);
             if (existingTab) {
                 switchTab(node.id);
@@ -421,14 +573,20 @@
                 const processed = preprocessMath(data.content);
                 const parsedSlides = parseSlides(data.content, processed.mathMap);
 
+                // 탭 이름 설정 (root가 아니면 폴더명/파일명)
+                let displayName = node.name;
+                if (parentName && parentName !== 'root') {
+                    displayName = `${parentName}/${node.name}`;
+                }
+
                 const newTab = {
                     id: node.id,
-                    name: node.name,
+                    name: displayName,
                     content: data.content,
                     processedContent: marked.parse(processed.content),
                     mathMap: processed.mathMap,
                     slides: parsedSlides,
-                    currentIndex: initialIndex, // [수정] 전달받은 인덱스 적용
+                    currentIndex: initialIndex,
                     zoom: 100
                 };
 
@@ -441,6 +599,7 @@
 
             } catch (err) { console.error(err); alert("문서를 불러올 수 없습니다."); }
         }
+
         function renderTabBar() {
             tabBar.innerHTML = '';
             if (openedTabs.length === 0) {
@@ -457,10 +616,8 @@
                     <button class="tab-close"><i class="fas fa-times"></i></button>
                 `;
                 
-                // 탭 클릭: 전환
                 tabEl.onclick = () => switchTab(tab.id);
                 
-                // 닫기 버튼 클릭
                 const closeBtn = tabEl.querySelector('.tab-close');
                 closeBtn.onclick = (e) => {
                     e.stopPropagation();
@@ -477,14 +634,11 @@
 
             openedTabs.splice(index, 1);
             
-            // 닫은 탭이 활성 탭이었다면 다른 탭 활성화
             if (id === activeTabId) {
                 if (openedTabs.length > 0) {
-                    // 이전 탭 또는 다음 탭으로 이동
                     const newIndex = index > 0 ? index - 1 : 0;
                     switchTab(openedTabs[newIndex].id);
                 } else {
-                    // 모든 탭 닫힘
                     activeTabId = null;
                     emptyView.classList.remove('hidden');
                     toolbar.style.display = 'none';
@@ -497,49 +651,28 @@
             saveSession();
         }
 
-        async function restoreSession() {
-            const savedTabsJSON = localStorage.getItem('viewer_tabs');
-            const savedActiveId = localStorage.getItem('viewer_active_id');
-        
-            if (savedTabsJSON) {
-                try {
-                    const savedTabs = JSON.parse(savedTabsJSON);
-                    
-                    for (const tabMeta of savedTabs) {
-                        // [수정] 저장된 currentIndex를 두 번째 인자로 전달
-                        await openDoc(
-                            { id: tabMeta.id, name: tabMeta.name }, 
-                            tabMeta.currentIndex || 0
-                        );
-                    }
-        
-                    if (savedActiveId) {
-                        switchTab(savedActiveId);
-                    }
-                } catch (e) {
-                    console.error("세션 복구 실패:", e);
-                    localStorage.removeItem('viewer_tabs');
-                }
-            }
-        }
-
         function switchTab(id) {
             activeTabId = id;
+            activeFileId = id; // 트리뷰 하이라이트 동기화
+            
+            // 트리뷰 UI 업데이트 (선택된 파일 강조)
+            document.querySelectorAll('.tree-content').forEach(c => c.classList.remove('active'));
+            const treeItem = document.querySelector(`.tree-content[onclick*="${id}"]`);
+            if(treeItem) treeItem.classList.add('active');
+
             saveSession();
+            
             const tab = openedTabs.find(t => t.id === id);
             if (!tab) return;
 
-            // UI 업데이트
             renderTabBar();
             emptyView.classList.add('hidden');
             toolbar.style.display = 'flex';
 
-            // 스크롤 뷰 렌더링
             markdownBody.innerHTML = tab.processedContent;
             postprocessMath(markdownBody, tab.mathMap);
 
-            // 프레젠테이션 뷰 초기화
-            setViewMode('presentation'); // 기본은 프레젠테이션
+            setViewMode('presentation');
             renderCurrentSlide();
             applyFontSize();
         }
@@ -548,29 +681,72 @@
             return openedTabs.find(t => t.id === activeTabId);
         }
 
+        async function restoreSession() {
+            const savedTabsJSON = localStorage.getItem('viewer_tabs');
+            const savedActiveId = localStorage.getItem('viewer_active_id');
+        
+            if (savedTabsJSON) {
+                try {
+                    const savedTabs = JSON.parse(savedTabsJSON);
+                    for (const tabMeta of savedTabs) {
+                        // 세션 복구 시 부모 이름은 정확히 알기 어려우므로 기본값 혹은 저장된 이름 사용
+                        // 여기서는 일단 파일명만 넘기거나, 탭 이름을 그대로 활용할 수도 있음
+                        // 편의상 parentName은 'root'로 넘겨도 openDoc 내부 로직에 의해 탭 이름은 tabMeta.name이 덮어쓰지 않음 (openDoc 수정 필요)
+                        // 하지만 openDoc은 노드 정보를 기반으로 이름을 새로 생성함.
+                        // 정확한 복구를 위해 tabMeta.name을 유지하고 싶다면 openDoc 로직을 조금 수정해야 함.
+                        // 일단은 'root'로 호출하여 파일명만 띄우거나, 파일이 실제 트리에 있다면 유저가 클릭시 업데이트 됨.
+                        await openDoc({ id: tabMeta.id, name: tabMeta.name.split('/').pop() }, tabMeta.currentIndex || 0, 'root');
+                    }
+                    if (savedActiveId) switchTab(savedActiveId);
+                } catch (e) {
+                    console.error("세션 복구 실패:", e);
+                    localStorage.removeItem('viewer_tabs');
+                }
+            }
+        }
+
+        function saveSession() {
+            const sessionData = openedTabs.map(t => ({ 
+                id: t.id, 
+                name: t.name, 
+                currentIndex: t.currentIndex || 0 
+            }));
+            localStorage.setItem('viewer_tabs', JSON.stringify(sessionData));
+            localStorage.setItem('viewer_active_id', activeTabId || '');
+        }
+
         // ==========================================
-        // 슬라이드 및 렌더링 로직
+        // 5. Viewer & Presentation Logic
         // ==========================================
 
+        viewModeBtn.addEventListener('click', () => {
+            if (viewMode === 'scroll') setViewMode('presentation');
+            else setViewMode('scroll');
+        });
+
+        function setViewMode(mode) {
+            viewMode = mode;
+            const zoomControls = document.getElementById('zoomControls');
+            const copyImageBtn = document.getElementById('copyImageBtn');
+
+            if (mode === 'presentation') {
+                viewModeBtn.innerHTML = '<i class="fas fa-scroll"></i> <span>스크롤 모드</span>';
+                scrollView.classList.add('hidden');
+                presentationView.classList.add('active');
+                zoomControls.classList.remove('hidden'); zoomControls.classList.add('flex');
+                copyImageBtn.classList.remove('hidden'); copyImageBtn.classList.add('flex');      
+                if (activeTabId) { renderCurrentSlide(); applyFontSize(); }
+            } else {
+                viewModeBtn.innerHTML = '<i class="fas fa-desktop"></i> <span>프레젠테이션 모드</span>';
+                presentationView.classList.remove('active');
+                scrollView.classList.remove('hidden');
+                zoomControls.classList.remove('flex'); zoomControls.classList.add('hidden');
+                copyImageBtn.classList.remove('flex'); copyImageBtn.classList.add('hidden');    
+            }
+        }
+
         function parseSlides(content, mathMap) {
-            const processedContent = content.replace(/\$\$([\s\S]+?)\$\$/g, (m, c) => `$$${c}$$`) // 보존
-                                            .replace(/\$([^$\n]+?)\$/g, (m, c) => `$${c}$`);
-            
-            // 전처리된 맵을 사용하기 위해 재처리 로직 필요 (여기선 간소화를 위해 marked 처리 후 분리)
-            // 사실 parseSlides 함수 내에서 HTML 파싱을 수행합니다.
-            
-            // 전체를 다시 HTML로 변환 (Math placeholder 포함)
-            // preprocessMath는 이미 openDoc에서 수행했으므로, 여기선 placeholder가 있는 content를 가정하거나,
-            // 별도로 처리해야 하는데, 편의상 openDoc에서 만든 mathMap을 사용합니다.
-            
-            // *중요*: 마크다운을 HTML로 변환할 때 MathJax 플레이스홀더가 있는 상태여야 함.
-            // openDoc에서 `processed.content`를 사용.
-            
-            // 여기서 `content` 인자는 raw content가 아니라 `processed.content` 여야 함.
-            // 그러나 openDoc 구조상 raw content를 넘겼음. 수정 필요.
-            
-            // Fix: parseSlides 내부에서 전처리 다시 수행 (openDoc 코드 흐름에 맞춤)
-            const processed = preprocessMath(content); // 중복 수행이지만 안전함
+            const processed = preprocessMath(content);
             const html = marked.parse(processed.content);
             const tempDiv = document.createElement('div');
             tempDiv.innerHTML = html;
@@ -579,7 +755,6 @@
             let currentSlide = null;
 
             Array.from(tempDiv.children).forEach(child => {
-                // H2 태그에 'Slide' 텍스트가 있으면 새 슬라이드
                 if (child.tagName === 'H2' && child.innerText.toLowerCase().includes('slide')) {
                     if (currentSlide) slides.push(currentSlide);
                     currentSlide = { image: null, htmlParts: [] };
@@ -592,13 +767,11 @@
                 if (img) {
                     if (!currentSlide.image) currentSlide.image = img.src;
                     else currentSlide.htmlParts.push(child.outerHTML);
-                } else if (child.tagName !== 'HR') { // HR은 무시
+                } else if (child.tagName !== 'HR') {
                     currentSlide.htmlParts.push(child.outerHTML);
                 }
             });
             if (currentSlide) slides.push(currentSlide);
-            
-            // 슬라이드 배열 객체에 mathMap을 attach하지 않고, 탭 객체가 mathMap을 가짐
             return slides;
         }
 
@@ -608,118 +781,74 @@
             
             const slide = tab.slides[tab.currentIndex];
             
-            // 이미지 처리
             if (slide.image) {
-                slideImage.src = slide.image; 
-                slideImage.classList.remove('hidden'); 
-                noImageText.classList.add('hidden');
+                slideImage.src = slide.image; slideImage.classList.remove('hidden'); noImageText.classList.add('hidden');
             } else {
-                slideImage.classList.add('hidden'); 
-                noImageText.classList.remove('hidden');
+                slideImage.classList.add('hidden'); noImageText.classList.remove('hidden');
             }
 
-            // 텍스트 처리
             slideText.innerHTML = slide.htmlParts.join('');
             postprocessMath(slideText, tab.mathMap);
 
-            // 네비게이션 상태
             pageIndicator.textContent = `${tab.currentIndex + 1} / ${tab.slides.length}`;
             prevSlideBtn.disabled = tab.currentIndex === 0;
             nextSlideBtn.disabled = tab.currentIndex === tab.slides.length - 1;
-            
             slideTextContainer.scrollTop = 0;
         }
 
-        // 네비게이션 이벤트
         prevSlideBtn.addEventListener('click', () => { 
             const tab = getActiveTab();
-            if (tab && tab.currentIndex > 0) { 
-                tab.currentIndex--; 
-                renderCurrentSlide(); 
-                saveSession(); // [추가] 위치 저장
-            } 
+            if (tab && tab.currentIndex > 0) { tab.currentIndex--; renderCurrentSlide(); saveSession(); } 
         });
 
         nextSlideBtn.addEventListener('click', () => { 
             const tab = getActiveTab();
-            if (tab && tab.currentIndex < tab.slides.length - 1) { 
-                tab.currentIndex++; 
-                renderCurrentSlide(); 
-                saveSession(); // [추가] 위치 저장
-            } 
+            if (tab && tab.currentIndex < tab.slides.length - 1) { tab.currentIndex++; renderCurrentSlide(); saveSession(); } 
         });
 
         document.addEventListener('keydown', (e) => {
             if (viewMode !== 'presentation') return;
-            const tab = getActiveTab();
-            if (!tab) return;
-            
-            // 버튼 클릭 이벤트를 트리거하므로 위에서 추가한 saveSession()이 자동으로 수행됨
             if (e.key === 'ArrowLeft') prevSlideBtn.click();
             if (e.key === 'ArrowRight') nextSlideBtn.click();
         });
 
-        // ==========================================
-        // 폰트 크기 조절
-        // ==========================================
         function adjustFontSize(delta) {
             const tab = getActiveTab();
             if (!tab) return;
-
             tab.zoom += delta;
             if (tab.zoom < 50) tab.zoom = 50;
             if (tab.zoom > 200) tab.zoom = 200;
-            
             applyFontSize();
         }
 
         function applyFontSize() {
             const tab = getActiveTab();
             if (!tab) return;
-
             slideText.style.fontSize = `${tab.zoom}%`;
             zoomDisplay.textContent = `${tab.zoom}%`;
         }
 
         // ==========================================
-        // 전체 화면 (Fullscreen)
+        // 6. Fullscreen & UI Utils
         // ==========================================
+
         function toggleFullScreen() {
             const isFullscreen = body.classList.contains('fullscreen-mode');
+            const elem = document.documentElement;
             
             if (!isFullscreen) {
-                // Enter Fullscreen
                 body.classList.add('fullscreen-mode');
-                
-                // 브라우저 전체화면 API 요청
-                const elem = document.documentElement;
-                if (elem.requestFullscreen) {
-                    elem.requestFullscreen().catch(err => console.log(err));
-                } else if (elem.webkitRequestFullscreen) { /* Safari */
-                    elem.webkitRequestFullscreen();
-                } else if (elem.msRequestFullscreen) { /* IE11 */
-                    elem.msRequestFullscreen();
-                }
-
+                if (elem.requestFullscreen) elem.requestFullscreen().catch(e=>console.log(e));
+                else if (elem.webkitRequestFullscreen) elem.webkitRequestFullscreen();
                 document.getElementById('fullscreenBtn').innerHTML = '<i class="fas fa-compress"></i>';
-                
             } else {
-                // Exit Fullscreen
                 body.classList.remove('fullscreen-mode');
-                
-                if (document.exitFullscreen) {
-                    document.exitFullscreen().catch(err => console.log(err));
-                } else if (document.webkitExitFullscreen) { /* Safari */
-                    document.webkitExitFullscreen();
-                } else if (document.msExitFullscreen) { /* IE11 */
-                    document.msExitFullscreen();
-                }
-
+                if (document.exitFullscreen) document.exitFullscreen().catch(e=>console.log(e));
+                else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
                 document.getElementById('fullscreenBtn').innerHTML = '<i class="fas fa-expand"></i>';
             }
         }
 
-        // ESC 키로 전체화면 해제 시 UI 동기화
         document.addEventListener('fullscreenchange', () => {
             if (!document.fullscreenElement) {
                 body.classList.remove('fullscreen-mode');
@@ -727,9 +856,100 @@
             }
         });
 
+        // Sidebar Toggle
+        hideSidebarBtn.addEventListener('click', () => {
+            body.classList.add('sidebar-closed');
+            localStorage.setItem('sidebarClosed', 'true');
+        });
+        openSidebarBtn.addEventListener('click', () => {
+            if (body.classList.contains('sidebar-closed')) {
+                body.classList.remove('sidebar-closed');
+                localStorage.setItem('sidebarClosed', 'false');
+            } else {
+                toggleSidebar(true);
+            }
+        });
+        function toggleSidebar(show) {
+            if (show) { sidebar.classList.remove('-translate-x-full'); sidebarOverlay.classList.remove('hidden'); setTimeout(()=>sidebarOverlay.classList.remove('opacity-0'),10); }
+            else { sidebar.classList.add('-translate-x-full'); sidebarOverlay.classList.add('opacity-0'); setTimeout(()=>sidebarOverlay.classList.add('hidden'),300); }
+        }
+        closeSidebarBtn.addEventListener('click', () => toggleSidebar(false));
+        sidebarOverlay.addEventListener('click', () => toggleSidebar(false));
+
+        // Drag & Drop
+        let dragCounter = 0;
+        body.addEventListener('dragenter', (e) => { e.preventDefault(); dragCounter++; dragOverlay.classList.add('active'); });
+        body.addEventListener('dragleave', (e) => { e.preventDefault(); dragCounter--; if (dragCounter === 0) dragOverlay.classList.remove('active'); });
+        body.addEventListener('dragover', (e) => { e.preventDefault(); });
+        body.addEventListener('drop', async (e) => {
+            e.preventDefault(); dragCounter = 0; dragOverlay.classList.remove('active');
+            if (e.dataTransfer.files[0]) handleFileUpload(e.dataTransfer.files[0]);
+        });
+
         // ==========================================
-        // Math Processing (KaTeX)
+        // 7. CRUD Operations (Updated for Tree)
         // ==========================================
+
+        async function handleFileUpload(file) {
+            // 트리 구조에서는 현재 선택된 폴더가 모호할 수 있으므로 'root'에 업로드
+            const parentId = 'root'; 
+            const formData = new FormData(); 
+            formData.append('file', file); 
+            formData.append('parent_id', parentId);
+            
+            const btn = document.getElementById('uploadBtn'); 
+            const org = btn.innerHTML; 
+            btn.innerHTML='<i class="fas fa-spinner fa-spin"></i>'; 
+            btn.disabled=true;
+            
+            try { 
+                const res = await fetch('/api/docs/upload', {method:'POST',body:formData}); 
+                if(!res.ok) throw new Error; 
+                loadTreeRoot(); // 트리 새로고침
+            }
+            catch(e){ alert('업로드 실패'); } 
+            finally{ btn.innerHTML=org; btn.disabled=false; }
+        }
+
+        async function createFolder() {
+            const name = prompt('새 폴더 이름 (Root에 생성):'); 
+            if(!name) return;
+            const formData = new FormData(); 
+            formData.append('name', name); 
+            formData.append('parent_id', 'root');
+            await fetch('/api/docs/folder', {method:'POST',body:formData}); 
+            loadTreeRoot();
+        }
+
+        function downloadFile(e, id) {
+            e.stopPropagation();
+            window.location.href = `/api/docs/download/${id}`;
+        }
+
+        async function deleteNode(e, id) {
+            e.stopPropagation();
+            if (!confirm('삭제하시겠습니까?')) return;
+            try {
+                await fetch(`/api/docs/${id}`, { method: 'DELETE' });
+                closeTab(id);
+                loadTreeRoot(); // 전체 트리 새로고침 (간단한 동기화)
+            } catch (err) { alert('삭제 실패'); }
+        }
+
+        async function copySlideImage() {
+            const img = document.getElementById('slideImage');
+            if (!img || img.classList.contains('hidden')) return alert('이미지 없음');
+            try {
+                const blob = await (await fetch(img.src)).blob();
+                await navigator.clipboard.write([new ClipboardItem({ [blob.type]: blob })]);
+                alert('이미지 복사 완료');
+            } catch(e) { alert('복사 실패'); }
+        }
+
+        // ==========================================
+        // 8. MathJax / History Modal
+        // ==========================================
+
         function preprocessMath(content) {
             const mathMap = [];
             content = content.replace(/\$\$([\s\S]+?)\$\$/g, (m, c) => { const id = `MB_${mathMap.length}`; mathMap.push({id, c, t:'b'}); return id; });
@@ -747,101 +967,7 @@
             hljs.highlightAll();
         }
 
-        // ==========================================
-        // Utility Functions
-        // ==========================================
-        async function copySlideImage() {
-            const imgElement = document.getElementById('slideImage');
-            const copyIcon = document.getElementById('copyIcon');
-            const btn = document.getElementById('copyImageBtn');
-        
-            if (!imgElement || imgElement.classList.contains('hidden') || !imgElement.src) {
-                alert('복사할 이미지가 없습니다.');
-                return;
-            }
-        
-            try {
-                const response = await fetch(imgElement.src);
-                const blob = await response.blob();
-                await navigator.clipboard.write([new ClipboardItem({ [blob.type]: blob })]);
-        
-                const originalClass = copyIcon.className;
-                copyIcon.className = "fas fa-check text-green-400";
-                btn.classList.add("border-green-500/50");
-                setTimeout(() => {
-                    copyIcon.className = "far fa-copy";
-                    btn.classList.remove("border-green-500/50");
-                }, 1500);
-            } catch (err) {
-                console.error(err);
-                alert('이미지 복사 실패 (보안 컨텍스트 필요)');
-            }
-        }
-
-        function toggleSidebar(show) {
-            if (show) { sidebar.classList.remove('-translate-x-full'); sidebarOverlay.classList.remove('hidden'); setTimeout(()=>sidebarOverlay.classList.remove('opacity-0'),10); }
-            else { sidebar.classList.add('-translate-x-full'); sidebarOverlay.classList.add('opacity-0'); setTimeout(()=>sidebarOverlay.classList.add('hidden'),300); }
-        }
-        closeSidebarBtn.addEventListener('click', () => toggleSidebar(false));
-        sidebarOverlay.addEventListener('click', () => toggleSidebar(false));
-
-        async function loadNodes(parentId) {
-            if (parentId === 'root' || parentId === undefined) parentId = null;
-            currentParentId = parentId; updateBreadcrumb();
-            try { const res = await fetch(`/api/docs/nodes?parent_id=${parentId ? parentId : 'root'}`); if(!res.ok)throw new Error; renderNodes(await res.json()); } catch (err) { console.error(err); }
-        }
-
-        function renderNodes(nodes) {
-            nodeList.innerHTML = '';
-            if (currentParentId !== null) nodeList.appendChild(createNodeElement('.. (상위)', 'fas fa-level-up-alt', 'text-notion-muted', () => goUp()));
-            if (nodes.length === 0) {
-                const emptyMsg = document.createElement('div'); emptyMsg.className = 'text-center text-xs text-notion-muted py-4 select-none'; emptyMsg.textContent = '비어 있음'; nodeList.appendChild(emptyMsg); return; 
-            }
-            nodes.forEach(node => {
-                const icon = node.type === 'folder' ? 'fas fa-folder text-yellow-500' : 'fas fa-file-lines text-blue-400';
-                const div = createNodeElement(node.name, icon, '', () => { if (node.type === 'folder') enterFolder(node.id, node.name); else openDoc(node); });
-                const btnContainer = document.createElement('div'); btnContainer.className = 'flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition';
-                if (node.type === 'file') {
-                    const downBtn = document.createElement('button'); downBtn.className = 'text-notion-muted hover:text-green-400 p-1'; downBtn.innerHTML = '<i class="fas fa-download text-xs"></i>';
-                    downBtn.onclick = (e) => { e.stopPropagation(); window.location.href = `/api/docs/download/${node.id}`; }; btnContainer.appendChild(downBtn);
-                }
-                const delBtn = document.createElement('button'); delBtn.className = 'text-notion-muted hover:text-red-400 p-1'; delBtn.innerHTML = '<i class="fas fa-trash-alt text-xs"></i>';
-                delBtn.onclick = (e) => { e.stopPropagation(); deleteNode(node.id, node.name); }; btnContainer.appendChild(delBtn);
-                div.appendChild(btnContainer); nodeList.appendChild(div);
-            });
-        }
-
-        function createNodeElement(text, iconClass, textClass, onClick) {
-            const div = document.createElement('div'); div.className = 'group flex items-center justify-between px-3 py-2 text-sm text-notion-text hover:bg-notion-hover rounded-md cursor-pointer transition-all select-none';
-            div.innerHTML = `<div class="flex items-center flex-1 truncate ${textClass}"><i class="${iconClass} mr-3 w-4 text-center opacity-80"></i><span class="truncate">${text}</span></div>`;
-            div.onclick = onClick; return div;
-        }
-        
-        function enterFolder(id, name) { if(currentPath.at(-1).id===id)return; currentPath.push({id,name}); loadNodes(id); }
-        function goUp() { if(currentPath.length>1) { currentPath.pop(); loadNodes(currentPath.at(-1).id); } else { currentPath=[{id:null,name:'root'}]; loadNodes(null); }}
-        function updateBreadcrumb() { breadcrumb.innerHTML = currentPath.map(p => p.name).join(' <span class="mx-1 opacity-50">/</span> '); }
-
-        async function handleFileUpload(file) {
-            const formData = new FormData(); formData.append('file', file); formData.append('parent_id', currentParentId || 'root');
-            const btn = document.getElementById('uploadBtn'); const org = btn.innerHTML; btn.innerHTML='<i class="fas fa-spinner fa-spin"></i>'; btn.disabled=true;
-            try { const res=await fetch('/api/docs/upload',{method:'POST',body:formData}); if(!res.ok)throw new Error; loadNodes(currentParentId); }
-            catch(e){alert('업로드 실패');} finally{btn.innerHTML=org;btn.disabled=false;}
-        }
-        async function createFolder() {
-            const name=prompt('폴더 이름:'); if(!name)return;
-            const formData=new FormData(); formData.append('name',name); formData.append('parent_id', currentParentId||'root');
-            await fetch('/api/docs/folder',{method:'POST',body:formData}); loadNodes(currentParentId);
-        }
-        zipInput.addEventListener('change', (e)=>{if(e.target.files[0])handleFileUpload(e.target.files[0]);e.target.value=''});
-        async function deleteNode(id,name) {
-            if(!confirm('삭제하시겠습니까?'))return; await fetch(`/api/docs/${id}`,{method:'DELETE'}); loadNodes(currentParentId);
-            // 탭도 닫기
-            closeTab(id);
-        }
-
-        // ==========================================
-        // History Logic
-        // ==========================================
+        // History Modal
         const historyModal = document.getElementById('historyModal');
         const historyList = document.getElementById('historyList');
 
@@ -857,22 +983,10 @@
         function closeHistoryModal() {
             historyModal.classList.add('opacity-0');
             document.getElementById('historyModalContent').classList.add('scale-95');
-            setTimeout(() => {
-                historyModal.classList.add('hidden');
-            }, 200);
+            setTimeout(() => { historyModal.classList.add('hidden'); }, 200);
         }
 
         historyModal.addEventListener('click', (e) => { if (e.target === historyModal) closeHistoryModal(); });
-
-        function saveSession() {
-            const sessionData = openedTabs.map(t => ({ 
-                id: t.id, 
-                name: t.name, 
-                currentIndex: t.currentIndex || 0  // 여기 추가됨
-            }));
-            localStorage.setItem('viewer_tabs', JSON.stringify(sessionData));
-            localStorage.setItem('viewer_active_id', activeTabId || '');
-        }
 
         async function fetchHistory() {
             historyList.innerHTML = '<div class="text-center text-notion-muted py-8"><i class="fas fa-spinner fa-spin text-2xl mb-2"></i><p>로딩 중...</p></div>';
@@ -900,11 +1014,11 @@
 
         async function importJob(jobId) {
             if (!confirm('가져오시겠습니까?')) return;
-            const formData = new FormData(); formData.append('parent_id', currentParentId || 'root');
+            const formData = new FormData(); formData.append('parent_id', 'root');
             try {
                 const res = await fetch(`/api/docs/import/${jobId}`, { method: 'POST', body: formData });
                 if (!res.ok) throw new Error;
-                closeHistoryModal(); loadNodes(currentParentId);
+                closeHistoryModal(); loadTreeRoot();
             } catch (err) { alert('실패'); }
         }
     </script>

@@ -19,7 +19,7 @@ async def index(request: Request):
 
     user_settings = AuthManager.get_user_settings(user)
 
-    return templates.TemplateResponse("index.html", {
+    return templates.TemplateResponse("dashboard.html", {
         "request": request, 
         "username": user,
         "settings": user_settings  

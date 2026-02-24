@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from app.routes import api, views, docs
 from app.core.config import settings
+from fastapi.responses import FileResponse
 
 app = FastAPI(title="LecAI")
 

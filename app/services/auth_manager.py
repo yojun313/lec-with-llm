@@ -164,6 +164,14 @@ class AuthManager:
         return result.matched_count > 0
     
     @staticmethod
+    def update_preferred_model(username, model_choice):
+        result = users_col.update_one(
+            {"username": username},
+            {"$set": {"preferred_model": model_choice}}
+        )
+        return result.matched_count > 0
+    
+    @staticmethod
     def get_user_settings(username):
         user = users_col.find_one({"username": username})
         

@@ -39,19 +39,15 @@
                                 'h1, h2, h3': { color: '#fff', fontWeight: '700', marginTop: '1.2em', marginBottom: '0.6em' },
                                 'p': { marginTop: '0.5em', marginBottom: '0.5em' },
                                 strong: { color: '#fff' },
-                                
-                                // ▼▼▼ [여기 수정됨] code 스타일 수정 ▼▼▼
                                 code: { 
                                     color: '#ff7b72', 
                                     backgroundColor: '#3a3a3a', 
                                     padding: '2px 4px', 
                                     borderRadius: '4px',
-                                    fontWeight: '600',     /* 폰트 굵기 조정 (선택사항) */
-                                    '&::before': { content: '"" !important' }, /* 시작 백틱 제거 */
-                                    '&::after': { content: '"" !important' }   /* 끝 백틱 제거 */
+                                    fontWeight: '600',
+                                    '&::before': { content: '"" !important' },
+                                    '&::after': { content: '"" !important' }
                                 },
-                                // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
-    
                                 pre: { backgroundColor: '#1e1e1e', border: '1px solid #333' },
                                 blockquote: { borderLeftColor: '#3b82f6', backgroundColor: '#262626' },
                             }
@@ -70,19 +66,11 @@
         #dragOverlay { transition: all 0.2s ease; opacity: 0; visibility: hidden; pointer-events: none; z-index: 9999; }
         #dragOverlay.active { opacity: 1; visibility: visible; pointer-events: auto; }
 
-        /* 사이드바 접기 관련 스타일 */
-        #sidebar {
-            transition: transform 0.3s ease, margin-left 0.3s ease;
-        }
-
-        /* 데스크탑에서 사이드바가 닫혔을 때의 레이아웃 */
+        /* Sidebar Styles */
+        #sidebar { transition: transform 0.3s ease, margin-left 0.3s ease; }
         @media (min-width: 768px) {
-            .sidebar-closed #sidebar {
-                margin-left: -18rem; /* w-72와 동일한 크기 */
-            }
-            .sidebar-closed #openSidebarBtn {
-                display: flex !important;
-            }
+            .sidebar-closed #sidebar { margin-left: -18rem; }
+            .sidebar-closed #openSidebarBtn { display: flex !important; }
         }
 
         /* Presentation Mode Styles */
@@ -115,6 +103,40 @@
             .split-image-container { width: 100%; height: 40%; border-right: none; border-bottom: 1px solid #333; }
             .split-text-container { width: 100%; height: 60%; padding: 2rem; }
         }
+
+        /* Tab Styles */
+        .tab-item {
+            display: flex; align-items: center;
+            padding: 0.5rem 1rem;
+            font-size: 0.875rem;
+            color: #a0a0a0;
+            background-color: #202020;
+            border-right: 1px solid #333;
+            cursor: pointer;
+            user-select: none;
+            max-width: 200px;
+            min-width: 120px;
+            transition: background-color 0.2s;
+        }
+        .tab-item:hover { background-color: #2c2c2c; }
+        .tab-item.active {
+            background-color: #191919;
+            color: #fff;
+            border-top: 2px solid #3b82f6;
+        }
+        .tab-close {
+            margin-left: auto;
+            padding: 2px;
+            border-radius: 4px;
+        }
+        .tab-close:hover { background-color: #444; color: #ff7b72; }
+
+        /* Fullscreen Mode Styles */
+        body.fullscreen-mode #sidebar { display: none !important; }
+        body.fullscreen-mode header { display: none !important; }
+        body.fullscreen-mode #tabBar { display: none !important; }
+        body.fullscreen-mode #exitFullscreenBtn { display: flex !important; }
+        body.fullscreen-mode main { height: 100vh !important; }
     </style>
 </head>
 <body class="bg-notion-bg text-notion-text font-sans h-screen flex overflow-hidden relative">
@@ -127,7 +149,7 @@
         <p class="text-notion-muted text-lg">현재 폴더에 자동으로 업로드됩니다.</p>
     </div>
 
-    <aside id="sidebar" class="fixed inset-y-0 left-0 z-50 w-72 bg-notion-sidebar border-r border-notion-border flex flex-col md:relative transform -translate-x-full md:translate-x-0">
+    <aside id="sidebar" class="fixed inset-y-0 left-0 z-50 w-72 bg-notion-sidebar border-r border-notion-border flex flex-col md:relative transform -translate-x-full md:translate-x-0 flex-shrink-0">
         <div class="p-4 flex justify-between items-center bg-notion-sidebar group">
             <h1 class="text-xl font-bold text-white tracking-tight flex items-center truncate">
                 <i class="fas fa-book-open text-blue-500 mr-2.5"></i>Viewer
@@ -158,7 +180,7 @@
         <div id="nodeList" class="flex-1 overflow-y-auto p-2 space-y-0.5 custom-scrollbar"></div>
     </aside>
 
-    <main class="flex-1 flex flex-col h-full relative overflow-hidden bg-notion-bg">
+    <main class="flex-1 flex flex-col h-full relative overflow-hidden bg-notion-bg min-w-0">
         <header class="h-14 bg-notion-bg border-b border-notion-border flex items-center justify-between px-4 md:px-6 flex-shrink-0 z-30">
             <button id="openSidebarBtn" class="text-notion-muted hover:text-white mr-4 flex items-center">
                 <i class="fas fa-bars text-xl"></i>
@@ -179,11 +201,18 @@
                     </button>
                 </div>
                 
+                <button id="fullscreenBtn" onclick="toggleFullScreen()" class="text-notion-text bg-notion-hover border border-notion-border w-9 h-9 flex items-center justify-center rounded hover:bg-[#3a3a3a] transition shadow-sm mr-2" title="전체 화면">
+                    <i class="fas fa-expand"></i>
+                </button>
+
                 <button id="viewModeBtn" class="text-notion-text bg-notion-hover border border-notion-border px-3 py-1.5 rounded text-sm flex items-center gap-2 hover:bg-[#3a3a3a] transition shadow-sm">
                     <i class="fas fa-desktop"></i> <span>프레젠테이션 모드</span>
                 </button>
             </div>
         </header>
+        
+        <div id="tabBar" class="flex items-center bg-[#202020] border-b border-notion-border overflow-x-auto custom-scrollbar h-10 hidden flex-shrink-0">
+            </div>
 
         <div id="emptyView" class="flex-1 flex flex-col items-center justify-center text-notion-muted select-none p-4 text-center">
             <i class="far fa-file-alt text-6xl mb-6 opacity-20"></i>
@@ -219,6 +248,10 @@
                 </button>
             </div>
         </div>
+
+        <button id="exitFullscreenBtn" onclick="toggleFullScreen()" class="hidden absolute top-4 right-4 z-[100] w-10 h-10 bg-black/50 hover:bg-red-500/80 text-white rounded-full items-center justify-center transition backdrop-blur-md border border-white/20">
+            <i class="fas fa-times"></i>
+        </button>
     </main>
 
     <div id="historyModal" class="fixed inset-0 bg-black/70 z-[100] hidden flex items-center justify-center opacity-0 transition-opacity duration-200">
@@ -252,11 +285,11 @@
         // --- 상태 변수 ---
         let currentParentId = null;
         let currentPath = [{id: null, name: 'root'}];
-        let currentNodeData = null;
         let viewMode = 'presentation'; 
-        let slidesData = []; 
-        let currentSlideIndex = 0;
-        let currentFontSize = 100;
+        
+        // 탭 관리를 위한 변수
+        let openedTabs = []; // { id, name, content, slides:[], currentIndex:0, zoom:100, processedContent: '', mathMap: [] }
+        let activeTabId = null;
 
         // --- DOM Elements ---
         const nodeList = document.getElementById('nodeList');
@@ -264,6 +297,7 @@
         const zipInput = document.getElementById('zipInput');
         const dragOverlay = document.getElementById('dragOverlay');
         const toolbar = document.getElementById('toolbar');
+        const tabBar = document.getElementById('tabBar');
         const emptyView = document.getElementById('emptyView');
         const scrollView = document.getElementById('scrollView');
         const presentationView = document.getElementById('presentationView');
@@ -281,10 +315,10 @@
         const openSidebarBtn = document.getElementById('openSidebarBtn');
         const closeSidebarBtn = document.getElementById('closeSidebarBtn');
         const hideSidebarBtn = document.getElementById('hideSidebarBtn');
+        const zoomDisplay = document.getElementById('zoomDisplay');
         const body = document.body;
 
         // --- Init ---
-        // 저장된 사이드바 상태 반영
         if (localStorage.getItem('sidebarClosed') === 'true') {
             body.classList.add('sidebar-closed');
         }
@@ -292,29 +326,25 @@
         loadNodes(null);
         marked.setOptions({ breaks: true, gfm: true });
 
+        restoreSession();
+
+        // 이벤트 리스너 설정
         hideSidebarBtn.addEventListener('click', () => {
             body.classList.add('sidebar-closed');
             localStorage.setItem('sidebarClosed', 'true');
         });
 
-        const savedZoom = localStorage.getItem('presentationZoom');
-        if (savedZoom) {
-            currentFontSize = parseInt(savedZoom);
-        }
-
         openSidebarBtn.addEventListener('click', () => {
-            // 데스크탑에서 닫혀있는 상태라면 펼치기
             if (body.classList.contains('sidebar-closed')) {
                 body.classList.remove('sidebar-closed');
                 localStorage.setItem('sidebarClosed', 'false');
             } else {
-                // 모바일 환경에서의 동작
                 toggleSidebar(true);
             }
         });
 
         // ==========================================
-        // 드래그 앤 드롭 로직
+        // 드래그 앤 드롭
         // ==========================================
         let dragCounter = 0;
         body.addEventListener('dragenter', (e) => { e.preventDefault(); dragCounter++; dragOverlay.classList.add('active'); });
@@ -334,197 +364,372 @@
         // ==========================================
         viewModeBtn.addEventListener('click', () => {
             if (viewMode === 'scroll') {
-                viewMode = 'presentation';
-                viewModeBtn.innerHTML = '<i class="fas fa-scroll"></i> <span>전체 스크롤 모드</span>';
+                setViewMode('presentation');
+            } else {
+                setViewMode('scroll');
+            }
+        });
+
+        function setViewMode(mode) {
+            viewMode = mode;
+            const zoomControls = document.getElementById('zoomControls');
+            const copyImageBtn = document.getElementById('copyImageBtn');
+
+            if (mode === 'presentation') {
+                viewModeBtn.innerHTML = '<i class="fas fa-scroll"></i> <span>스크롤 모드</span>';
                 scrollView.classList.add('hidden');
                 presentationView.classList.add('active');
-
+                
                 zoomControls.classList.remove('hidden');
                 zoomControls.classList.add('flex');
-
                 copyImageBtn.classList.remove('hidden'); 
                 copyImageBtn.classList.add('flex');      
                 
-                applyFontSize(); // 저장된 크기 적용 
-                renderCurrentSlide();
+                if (activeTabId) {
+                    renderCurrentSlide();
+                    applyFontSize();
+                }
             } else {
-                viewMode = 'scroll';
                 viewModeBtn.innerHTML = '<i class="fas fa-desktop"></i> <span>프레젠테이션 모드</span>';
                 presentationView.classList.remove('active');
                 scrollView.classList.remove('hidden');
 
                 zoomControls.classList.remove('flex');
                 zoomControls.classList.add('hidden');
-
                 copyImageBtn.classList.remove('flex');   
                 copyImageBtn.classList.add('hidden');    
             }
-        });
-
-        // ==========================================
-        // 문서 열기 & 파싱
-        // ==========================================
-        async function copySlideImage() {
-            const imgElement = document.getElementById('slideImage');
-            const copyIcon = document.getElementById('copyIcon');
-            const btn = document.getElementById('copyImageBtn');
-        
-            // 이미지가 없거나 숨겨져 있다면 중단
-            if (!imgElement || imgElement.classList.contains('hidden') || !imgElement.src) {
-                alert('복사할 이미지가 없습니다.');
-                return;
-            }
-        
-            try {
-                // 1. 이미지 데이터를 Blob으로 가져오기
-                const response = await fetch(imgElement.src);
-                const blob = await response.blob();
-        
-                // 2. 클립보드에 쓰기
-                await navigator.clipboard.write([
-                    new ClipboardItem({
-                        [blob.type]: blob
-                    })
-                ]);
-        
-                // 3. 성공 시 아이콘 변경 (V 표시)
-                const originalClass = copyIcon.className;
-                copyIcon.className = "fas fa-check text-green-400";
-                btn.classList.add("border-green-500/50");
-                
-                // 1.5초 뒤 원복
-                setTimeout(() => {
-                    copyIcon.className = "far fa-copy";
-                    btn.classList.remove("border-green-500/50");
-                }, 1500);
-        
-            } catch (err) {
-                console.error('이미지 복사 실패:', err);
-                alert('이미지 복사에 실패했습니다. (보안 컨텍스트 필요)');
-            }
         }
 
-        async function openDoc(node) {
+        // ==========================================
+        // 탭 및 문서 열기 로직 (Core Logic)
+        // ==========================================
+
+        async function openDoc(node, initialIndex = 0) {
+            // 1. 이미 열려있는 탭인지 확인
+            const existingTab = openedTabs.find(tab => tab.id === node.id);
+            if (existingTab) {
+                switchTab(node.id);
+                return;
+            }
+
             try {
                 const res = await fetch(`/api/docs/content/${node.id}`); 
                 if (!res.ok) throw new Error("Load failed");
-                currentNodeData = await res.json(); 
-                currentNodeData.id = node.id;
-
-                emptyView.classList.add('hidden');
-                toolbar.style.display = 'flex';
+                const data = await res.json();
                 
-                // 모바일에서 열 때 사이드바 닫기
+                const processed = preprocessMath(data.content);
+                const parsedSlides = parseSlides(data.content, processed.mathMap);
+
+                const newTab = {
+                    id: node.id,
+                    name: node.name,
+                    content: data.content,
+                    processedContent: marked.parse(processed.content),
+                    mathMap: processed.mathMap,
+                    slides: parsedSlides,
+                    currentIndex: initialIndex, // [수정] 전달받은 인덱스 적용
+                    zoom: 100
+                };
+
+                openedTabs.push(newTab);
+                renderTabBar();
+                switchTab(newTab.id);
+                saveSession();
+                
                 if (window.innerWidth < 768) toggleSidebar(false);
-
-                renderFullMarkdown(currentNodeData.content);
-                parseSlides(currentNodeData.content);
-
-                applyFontSize();
-                
-                currentSlideIndex = 0;
-                viewMode = 'presentation';
-
-                const zoomControls = document.getElementById('zoomControls');
-                const copyImageBtn = document.getElementById('copyImageBtn');
-
-                if (zoomControls) {
-                    zoomControls.classList.remove('hidden');
-                    zoomControls.classList.add('flex');
-                }
-                if (copyImageBtn) {
-                    copyImageBtn.classList.remove('hidden');
-                    copyImageBtn.classList.add('flex');
-                }
-
-                viewModeBtn.innerHTML = '<i class="fas fa-scroll"></i> <span>전체 스크롤 모드</span>';
-                scrollView.classList.add('hidden');
-                presentationView.classList.add('active');
-                renderCurrentSlide();
 
             } catch (err) { console.error(err); alert("문서를 불러올 수 없습니다."); }
         }
+        function renderTabBar() {
+            tabBar.innerHTML = '';
+            if (openedTabs.length === 0) {
+                tabBar.classList.add('hidden');
+                return;
+            }
+            tabBar.classList.remove('hidden');
 
-        function adjustFontSize(delta) {
-            currentFontSize += delta;
-            // 최소 50% ~ 최대 200% 제한
-            if (currentFontSize < 50) currentFontSize = 50;
-            if (currentFontSize > 200) currentFontSize = 200;
+            openedTabs.forEach(tab => {
+                const tabEl = document.createElement('div');
+                tabEl.className = `tab-item ${tab.id === activeTabId ? 'active' : ''}`;
+                tabEl.innerHTML = `
+                    <span class="truncate mr-2" title="${tab.name}">${tab.name}</span>
+                    <button class="tab-close"><i class="fas fa-times"></i></button>
+                `;
+                
+                // 탭 클릭: 전환
+                tabEl.onclick = () => switchTab(tab.id);
+                
+                // 닫기 버튼 클릭
+                const closeBtn = tabEl.querySelector('.tab-close');
+                closeBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    closeTab(tab.id);
+                };
+
+                tabBar.appendChild(tabEl);
+            });
+        }
+
+        function closeTab(id) {
+            const index = openedTabs.findIndex(t => t.id === id);
+            if (index === -1) return;
+
+            openedTabs.splice(index, 1);
             
+            // 닫은 탭이 활성 탭이었다면 다른 탭 활성화
+            if (id === activeTabId) {
+                if (openedTabs.length > 0) {
+                    // 이전 탭 또는 다음 탭으로 이동
+                    const newIndex = index > 0 ? index - 1 : 0;
+                    switchTab(openedTabs[newIndex].id);
+                } else {
+                    // 모든 탭 닫힘
+                    activeTabId = null;
+                    emptyView.classList.remove('hidden');
+                    toolbar.style.display = 'none';
+                    tabBar.classList.add('hidden');
+                    scrollView.classList.add('hidden');
+                    presentationView.classList.remove('active');
+                }
+            }
+            renderTabBar();
+            saveSession();
+        }
+
+        async function restoreSession() {
+            const savedTabsJSON = localStorage.getItem('viewer_tabs');
+            const savedActiveId = localStorage.getItem('viewer_active_id');
+        
+            if (savedTabsJSON) {
+                try {
+                    const savedTabs = JSON.parse(savedTabsJSON);
+                    
+                    for (const tabMeta of savedTabs) {
+                        // [수정] 저장된 currentIndex를 두 번째 인자로 전달
+                        await openDoc(
+                            { id: tabMeta.id, name: tabMeta.name }, 
+                            tabMeta.currentIndex || 0
+                        );
+                    }
+        
+                    if (savedActiveId) {
+                        switchTab(savedActiveId);
+                    }
+                } catch (e) {
+                    console.error("세션 복구 실패:", e);
+                    localStorage.removeItem('viewer_tabs');
+                }
+            }
+        }
+
+        function switchTab(id) {
+            activeTabId = id;
+            saveSession();
+            const tab = openedTabs.find(t => t.id === id);
+            if (!tab) return;
+
+            // UI 업데이트
+            renderTabBar();
+            emptyView.classList.add('hidden');
+            toolbar.style.display = 'flex';
+
+            // 스크롤 뷰 렌더링
+            markdownBody.innerHTML = tab.processedContent;
+            postprocessMath(markdownBody, tab.mathMap);
+
+            // 프레젠테이션 뷰 초기화
+            setViewMode('presentation'); // 기본은 프레젠테이션
+            renderCurrentSlide();
             applyFontSize();
         }
 
-        function applyFontSize() {
-            const slideText = document.getElementById('slideText');
-            const zoomDisplay = document.getElementById('zoomDisplay');
-            
-            // Tailwind Prose는 rem 단위이므로 퍼센트 조절 시 자연스럽게 스케일링됨
-            if (slideText) slideText.style.fontSize = `${currentFontSize}%`;
-            if (zoomDisplay) zoomDisplay.textContent = `${currentFontSize}%`;
-            
-            // 설정 저장
-            localStorage.setItem('presentationZoom', currentFontSize);
+        function getActiveTab() {
+            return openedTabs.find(t => t.id === activeTabId);
         }
 
-        function renderFullMarkdown(content) {
-            const processed = preprocessMath(content);
-            markdownBody.innerHTML = marked.parse(processed.content);
-            postprocessMath(markdownBody, processed.mathMap);
-        }
+        // ==========================================
+        // 슬라이드 및 렌더링 로직
+        // ==========================================
 
-        function parseSlides(content) {
-            const processed = preprocessMath(content);
+        function parseSlides(content, mathMap) {
+            const processedContent = content.replace(/\$\$([\s\S]+?)\$\$/g, (m, c) => `$$${c}$$`) // 보존
+                                            .replace(/\$([^$\n]+?)\$/g, (m, c) => `$${c}$`);
+            
+            // 전처리된 맵을 사용하기 위해 재처리 로직 필요 (여기선 간소화를 위해 marked 처리 후 분리)
+            // 사실 parseSlides 함수 내에서 HTML 파싱을 수행합니다.
+            
+            // 전체를 다시 HTML로 변환 (Math placeholder 포함)
+            // preprocessMath는 이미 openDoc에서 수행했으므로, 여기선 placeholder가 있는 content를 가정하거나,
+            // 별도로 처리해야 하는데, 편의상 openDoc에서 만든 mathMap을 사용합니다.
+            
+            // *중요*: 마크다운을 HTML로 변환할 때 MathJax 플레이스홀더가 있는 상태여야 함.
+            // openDoc에서 `processed.content`를 사용.
+            
+            // 여기서 `content` 인자는 raw content가 아니라 `processed.content` 여야 함.
+            // 그러나 openDoc 구조상 raw content를 넘겼음. 수정 필요.
+            
+            // Fix: parseSlides 내부에서 전처리 다시 수행 (openDoc 코드 흐름에 맞춤)
+            const processed = preprocessMath(content); // 중복 수행이지만 안전함
             const html = marked.parse(processed.content);
             const tempDiv = document.createElement('div');
             tempDiv.innerHTML = html;
 
-            slidesData = [];
+            const slides = [];
             let currentSlide = null;
 
             Array.from(tempDiv.children).forEach(child => {
+                // H2 태그에 'Slide' 텍스트가 있으면 새 슬라이드
                 if (child.tagName === 'H2' && child.innerText.toLowerCase().includes('slide')) {
-                    if (currentSlide) slidesData.push(currentSlide);
+                    if (currentSlide) slides.push(currentSlide);
                     currentSlide = { image: null, htmlParts: [] };
                     currentSlide.htmlParts.push(child.outerHTML);
                     return;
                 }
                 if (!currentSlide) currentSlide = { image: null, htmlParts: [] };
+                
                 const img = child.querySelector('img') || (child.tagName === 'IMG' ? child : null);
                 if (img) {
                     if (!currentSlide.image) currentSlide.image = img.src;
                     else currentSlide.htmlParts.push(child.outerHTML);
-                } else if (child.tagName !== 'HR') {
+                } else if (child.tagName !== 'HR') { // HR은 무시
                     currentSlide.htmlParts.push(child.outerHTML);
                 }
             });
-            if (currentSlide) slidesData.push(currentSlide);
-            slidesData.mathMap = processed.mathMap;
+            if (currentSlide) slides.push(currentSlide);
+            
+            // 슬라이드 배열 객체에 mathMap을 attach하지 않고, 탭 객체가 mathMap을 가짐
+            return slides;
         }
 
         function renderCurrentSlide() {
-            if (slidesData.length === 0) return;
-            const slide = slidesData[currentSlideIndex];
+            const tab = getActiveTab();
+            if (!tab || tab.slides.length === 0) return;
+            
+            const slide = tab.slides[tab.currentIndex];
+            
+            // 이미지 처리
             if (slide.image) {
-                slideImage.src = slide.image; slideImage.classList.remove('hidden'); noImageText.classList.add('hidden');
+                slideImage.src = slide.image; 
+                slideImage.classList.remove('hidden'); 
+                noImageText.classList.add('hidden');
             } else {
-                slideImage.classList.add('hidden'); noImageText.classList.remove('hidden');
+                slideImage.classList.add('hidden'); 
+                noImageText.classList.remove('hidden');
             }
+
+            // 텍스트 처리
             slideText.innerHTML = slide.htmlParts.join('');
-            postprocessMath(slideText, slidesData.mathMap);
-            pageIndicator.textContent = `${currentSlideIndex + 1} / ${slidesData.length}`;
-            prevSlideBtn.disabled = currentSlideIndex === 0;
-            nextSlideBtn.disabled = currentSlideIndex === slidesData.length - 1;
+            postprocessMath(slideText, tab.mathMap);
+
+            // 네비게이션 상태
+            pageIndicator.textContent = `${tab.currentIndex + 1} / ${tab.slides.length}`;
+            prevSlideBtn.disabled = tab.currentIndex === 0;
+            nextSlideBtn.disabled = tab.currentIndex === tab.slides.length - 1;
+            
             slideTextContainer.scrollTop = 0;
         }
 
-        prevSlideBtn.addEventListener('click', () => { if (currentSlideIndex > 0) { currentSlideIndex--; renderCurrentSlide(); } });
-        nextSlideBtn.addEventListener('click', () => { if (currentSlideIndex < slidesData.length - 1) { currentSlideIndex++; renderCurrentSlide(); } });
+        // 네비게이션 이벤트
+        prevSlideBtn.addEventListener('click', () => { 
+            const tab = getActiveTab();
+            if (tab && tab.currentIndex > 0) { 
+                tab.currentIndex--; 
+                renderCurrentSlide(); 
+                saveSession(); // [추가] 위치 저장
+            } 
+        });
+
+        nextSlideBtn.addEventListener('click', () => { 
+            const tab = getActiveTab();
+            if (tab && tab.currentIndex < tab.slides.length - 1) { 
+                tab.currentIndex++; 
+                renderCurrentSlide(); 
+                saveSession(); // [추가] 위치 저장
+            } 
+        });
+
         document.addEventListener('keydown', (e) => {
             if (viewMode !== 'presentation') return;
+            const tab = getActiveTab();
+            if (!tab) return;
+            
+            // 버튼 클릭 이벤트를 트리거하므로 위에서 추가한 saveSession()이 자동으로 수행됨
             if (e.key === 'ArrowLeft') prevSlideBtn.click();
             if (e.key === 'ArrowRight') nextSlideBtn.click();
         });
 
+        // ==========================================
+        // 폰트 크기 조절
+        // ==========================================
+        function adjustFontSize(delta) {
+            const tab = getActiveTab();
+            if (!tab) return;
+
+            tab.zoom += delta;
+            if (tab.zoom < 50) tab.zoom = 50;
+            if (tab.zoom > 200) tab.zoom = 200;
+            
+            applyFontSize();
+        }
+
+        function applyFontSize() {
+            const tab = getActiveTab();
+            if (!tab) return;
+
+            slideText.style.fontSize = `${tab.zoom}%`;
+            zoomDisplay.textContent = `${tab.zoom}%`;
+        }
+
+        // ==========================================
+        // 전체 화면 (Fullscreen)
+        // ==========================================
+        function toggleFullScreen() {
+            const isFullscreen = body.classList.contains('fullscreen-mode');
+            
+            if (!isFullscreen) {
+                // Enter Fullscreen
+                body.classList.add('fullscreen-mode');
+                
+                // 브라우저 전체화면 API 요청
+                const elem = document.documentElement;
+                if (elem.requestFullscreen) {
+                    elem.requestFullscreen().catch(err => console.log(err));
+                } else if (elem.webkitRequestFullscreen) { /* Safari */
+                    elem.webkitRequestFullscreen();
+                } else if (elem.msRequestFullscreen) { /* IE11 */
+                    elem.msRequestFullscreen();
+                }
+
+                document.getElementById('fullscreenBtn').innerHTML = '<i class="fas fa-compress"></i>';
+                
+            } else {
+                // Exit Fullscreen
+                body.classList.remove('fullscreen-mode');
+                
+                if (document.exitFullscreen) {
+                    document.exitFullscreen().catch(err => console.log(err));
+                } else if (document.webkitExitFullscreen) { /* Safari */
+                    document.webkitExitFullscreen();
+                } else if (document.msExitFullscreen) { /* IE11 */
+                    document.msExitFullscreen();
+                }
+
+                document.getElementById('fullscreenBtn').innerHTML = '<i class="fas fa-expand"></i>';
+            }
+        }
+
+        // ESC 키로 전체화면 해제 시 UI 동기화
+        document.addEventListener('fullscreenchange', () => {
+            if (!document.fullscreenElement) {
+                body.classList.remove('fullscreen-mode');
+                document.getElementById('fullscreenBtn').innerHTML = '<i class="fas fa-expand"></i>';
+            }
+        });
+
+        // ==========================================
+        // Math Processing (KaTeX)
+        // ==========================================
         function preprocessMath(content) {
             const mathMap = [];
             content = content.replace(/\$\$([\s\S]+?)\$\$/g, (m, c) => { const id = `MB_${mathMap.length}`; mathMap.push({id, c, t:'b'}); return id; });
@@ -540,6 +745,37 @@
             element.innerHTML = html;
             renderMathInElement(element, { delimiters: [{left:'$$', right:'$$', display:true}, {left:'$', right:'$', display:false}], throwOnError: false });
             hljs.highlightAll();
+        }
+
+        // ==========================================
+        // Utility Functions
+        // ==========================================
+        async function copySlideImage() {
+            const imgElement = document.getElementById('slideImage');
+            const copyIcon = document.getElementById('copyIcon');
+            const btn = document.getElementById('copyImageBtn');
+        
+            if (!imgElement || imgElement.classList.contains('hidden') || !imgElement.src) {
+                alert('복사할 이미지가 없습니다.');
+                return;
+            }
+        
+            try {
+                const response = await fetch(imgElement.src);
+                const blob = await response.blob();
+                await navigator.clipboard.write([new ClipboardItem({ [blob.type]: blob })]);
+        
+                const originalClass = copyIcon.className;
+                copyIcon.className = "fas fa-check text-green-400";
+                btn.classList.add("border-green-500/50");
+                setTimeout(() => {
+                    copyIcon.className = "far fa-copy";
+                    btn.classList.remove("border-green-500/50");
+                }, 1500);
+            } catch (err) {
+                console.error(err);
+                alert('이미지 복사 실패 (보안 컨텍스트 필요)');
+            }
         }
 
         function toggleSidebar(show) {
@@ -599,124 +835,77 @@
         zipInput.addEventListener('change', (e)=>{if(e.target.files[0])handleFileUpload(e.target.files[0]);e.target.value=''});
         async function deleteNode(id,name) {
             if(!confirm('삭제하시겠습니까?'))return; await fetch(`/api/docs/${id}`,{method:'DELETE'}); loadNodes(currentParentId);
-            if(currentNodeData&&currentNodeData.id===id) { emptyView.classList.remove('hidden'); scrollView.classList.add('hidden'); presentationView.classList.remove('active'); toolbar.style.display='none'; }
+            // 탭도 닫기
+            closeTab(id);
         }
 
         // ==========================================
-        // History Modal Logic
+        // History Logic
         // ==========================================
         const historyModal = document.getElementById('historyModal');
-        const historyModalContent = document.getElementById('historyModalContent');
         const historyList = document.getElementById('historyList');
 
         function openHistoryModal() {
             historyModal.classList.remove('hidden');
-            // 애니메이션 효과
             setTimeout(() => {
                 historyModal.classList.remove('opacity-0');
-                historyModalContent.classList.remove('scale-95');
+                document.getElementById('historyModalContent').classList.remove('scale-95');
             }, 10);
             fetchHistory();
         }
 
         function closeHistoryModal() {
             historyModal.classList.add('opacity-0');
-            historyModalContent.classList.add('scale-95');
+            document.getElementById('historyModalContent').classList.add('scale-95');
             setTimeout(() => {
                 historyModal.classList.add('hidden');
             }, 200);
         }
 
-        // 모달 배경 클릭 시 닫기
-        historyModal.addEventListener('click', (e) => {
-            if (e.target === historyModal) closeHistoryModal();
-        });
+        historyModal.addEventListener('click', (e) => { if (e.target === historyModal) closeHistoryModal(); });
+
+        function saveSession() {
+            const sessionData = openedTabs.map(t => ({ 
+                id: t.id, 
+                name: t.name, 
+                currentIndex: t.currentIndex || 0  // 여기 추가됨
+            }));
+            localStorage.setItem('viewer_tabs', JSON.stringify(sessionData));
+            localStorage.setItem('viewer_active_id', activeTabId || '');
+        }
 
         async function fetchHistory() {
             historyList.innerHTML = '<div class="text-center text-notion-muted py-8"><i class="fas fa-spinner fa-spin text-2xl mb-2"></i><p>로딩 중...</p></div>';
-            
             try {
-                // API 호출 (경로는 실제 서버 설정에 맞게 조정 필요)
                 const res = await fetch('/api/docs/history'); 
-                if (!res.ok) throw new Error('Failed to fetch history');
-                
+                if (!res.ok) throw new Error;
                 const jobs = await res.json();
                 renderHistoryList(jobs);
-            } catch (err) {
-                console.error(err);
-                historyList.innerHTML = '<div class="text-center text-red-400 py-8"><i class="fas fa-exclamation-circle text-2xl mb-2"></i><p>목록을 불러오지 못했습니다.</p></div>';
-            }
+            } catch (err) { historyList.innerHTML = '<div class="text-center text-red-400 py-8"><p>불러오기 실패</p></div>'; }
         }
 
         function renderHistoryList(jobs) {
             historyList.innerHTML = '';
-            
-            if (jobs.length === 0) {
-                historyList.innerHTML = '<div class="text-center text-notion-muted py-10"><i class="far fa-folder-open text-4xl mb-3 opacity-30"></i><p>완료된 작업이 없습니다.</p></div>';
-                return;
-            }
-
+            if (jobs.length === 0) { historyList.innerHTML = '<div class="text-center text-notion-muted py-10"><p>작업 없음</p></div>'; return; }
             jobs.forEach(job => {
-                const dateStr = new Date(job.created_at).toLocaleDateString() + ' ' + new Date(job.created_at).toLocaleTimeString();
-                
                 const item = document.createElement('div');
                 item.className = 'flex items-center justify-between p-3 mb-1 bg-notion-sidebar border border-notion-border rounded-lg hover:border-purple-500/50 transition group';
-                
                 item.innerHTML = `
-                    <div class="flex-1 min-w-0 mr-4">
-                        <div class="flex items-center mb-1">
-                            <i class="fas fa-file-powerpoint text-orange-400 mr-2"></i>
-                            <span class="font-medium text-white truncate text-sm" title="${job.filename}">${job.filename}</span>
-                        </div>
-                        <div class="flex items-center text-xs text-notion-muted space-x-3">
-                            <span><i class="far fa-clock mr-1"></i>${dateStr}</span>
-                            <span class="text-green-400"><i class="fas fa-check-circle mr-1"></i>완료됨</span>
-                        </div>
-                    </div>
-                    <button onclick="importJob('${job.id}')" class="bg-purple-600 hover:bg-purple-500 text-white text-xs px-3 py-1.5 rounded shadow flex items-center transition">
-                        <i class="fas fa-download mr-1.5"></i> 가져오기
-                    </button>
+                    <div class="flex-1 min-w-0 mr-4"><div class="text-sm font-medium text-white truncate">${job.filename}</div></div>
+                    <button onclick="importJob('${job.id}')" class="bg-purple-600 hover:bg-purple-500 text-white text-xs px-3 py-1.5 rounded shadow">가져오기</button>
                 `;
                 historyList.appendChild(item);
             });
         }
 
         async function importJob(jobId) {
-            if (!confirm('이 작업을 현재 폴더로 가져오시겠습니까?')) return;
-
-            // 버튼 로딩 상태 표시
-            const btn = document.activeElement;
-            const originalHtml = btn.innerHTML;
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 처리 중';
-            btn.disabled = true;
-
-            const formData = new FormData();
-            formData.append('parent_id', currentParentId || 'root');
-
+            if (!confirm('가져오시겠습니까?')) return;
+            const formData = new FormData(); formData.append('parent_id', currentParentId || 'root');
             try {
-                // Import API 호출
-                const res = await fetch(`/api/docs/import/${jobId}`, {
-                    method: 'POST',
-                    body: formData
-                });
-
-                if (!res.ok) {
-                    const errData = await res.json();
-                    throw new Error(errData.detail || 'Import failed');
-                }
-
-                // 성공 시 처리
-                closeHistoryModal();
-                loadNodes(currentParentId); // 목록 새로고침
-                
-            } catch (err) {
-                alert('가져오기 실패: ' + err.message);
-            } finally {
-                if (btn) {
-                    btn.innerHTML = originalHtml;
-                    btn.disabled = false;
-                }
-            }
+                const res = await fetch(`/api/docs/import/${jobId}`, { method: 'POST', body: formData });
+                if (!res.ok) throw new Error;
+                closeHistoryModal(); loadNodes(currentParentId);
+            } catch (err) { alert('실패'); }
         }
     </script>
 </body>

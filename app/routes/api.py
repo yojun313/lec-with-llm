@@ -19,6 +19,8 @@ class VerifyRequest(BaseModel):
     email: str
     code: str
 
+class ModelUpdateRequest(BaseModel):
+    preferred_model: str
 
 @router.post("/auth/signup/request")
 async def api_signup_request(
@@ -234,3 +236,29 @@ async def upload_profile_image(
     users_col.update_one({"username": user}, {"$set": {"profile_img": profile_url}})
 
     return {"status": "success", "url": profile_url}
+
+@router.post("/settings/model")
+async def update_model_setting(
+    req: ModelUpdateRequest,
+    user: str = Depends(get_current_user)
+):
+    if req.preferred_model != "local":
+        
+        # 2. 유저의 현재 설정 정보를 가져옵니다.
+        current_settings = AuthManager.get_user_settings(user)
+        api_key = current_settings.get("openai_api_key")
+        
+        # 3. API Key가 없거나 공백이면 400 에러를 발생시킵니다.
+        if not api_key or not api_key.strip():
+            raise HTTPException(
+                status_code=400, 
+                detail="OpenAI API Key가 설정되지 않았습니다. 설정 메뉴에서 먼저 키를 등록해주세요."
+            )
+
+    # 4. 검증 통과 시 업데이트 진행
+    success = AuthManager.update_preferred_model(user, req.preferred_model)
+    
+    if not success:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    return {"status": "success", "model": req.preferred_model}

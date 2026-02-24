@@ -174,13 +174,26 @@
                             <div class="pt-4">
                                 <div class="flex justify-between items-center mb-3">
                                     <label class="block text-sm font-bold text-gray-300">System Prompt (AI 페르소나)</label>
-                                    <button type="button" onclick="resetPrompt()" class="text-xs text-gray-400 hover:text-white underline">
+                                    <button type="button" onclick="resetSystemPrompt()" class="text-xs text-gray-400 hover:text-white underline">
                                         기본값으로 초기화
                                     </button>
                                 </div>
-                                <textarea name="custom_prompt" id="customPrompt" rows="5" 
+                                <textarea name="custom_prompt" id="customPrompt" rows="4" 
+                                    class="w-full p-4 rounded-xl bg-gray-800 border border-gray-700 focus:border-blue-500 outline-none text-sm leading-relaxed transition resize-none mb-6"
+                                    placeholder="AI의 역할과 제약조건을 설정하세요..."></textarea>
+                            
+                                <div class="flex justify-between items-center mb-3">
+                                    <label class="block text-sm font-bold text-gray-300">User Prompt (슬라이드 분석 지침)</label>
+                                    <button type="button" onclick="resetUserPrompt()" class="text-xs text-gray-400 hover:text-white underline">
+                                        기본값으로 초기화
+                                    </button>
+                                </div>
+                                <p class="text-xs text-gray-500 mb-2">
+                                    <span class="bg-gray-800 px-1 py-0.5 rounded text-blue-300 font-mono">{filename}</span> 이라고 적으면 실제 파일명으로 자동 변경됩니다.
+                                </p>
+                                <textarea name="custom_user_prompt" id="customUserPrompt" rows="4" 
                                     class="w-full p-4 rounded-xl bg-gray-800 border border-gray-700 focus:border-blue-500 outline-none text-sm leading-relaxed transition resize-none"
-                                    placeholder="AI에게 내릴 상세 지시사항을 입력하세요..."></textarea>
+                                    placeholder="각 슬라이드 이미지를 보고 AI에게 시킬 구체적인 명령을 입력하세요..."></textarea>
                             </div>
                         </div>
                     </section>
@@ -294,10 +307,12 @@
         const currentModel = "{{ settings.preferred_model }}";
         const currentKey = "{{ settings.openai_api_key }}";
         const currentPrompt = `{{ settings.custom_prompt | safe }}`;
+        const currentUserPrompt = `{{ settings.custom_user_prompt | safe }}`;
         
         document.getElementById('modelSelect').value = currentModel || 'local';
         document.getElementById('apiKeyInput').value = currentKey || '';
         document.getElementById('customPrompt').value = currentPrompt;
+        document.getElementById('customUserPrompt').value = currentUserPrompt;
         
         const toggleApi = () => {
             document.getElementById('apiKeySection').classList.toggle('hidden', !document.getElementById('modelSelect').value.startsWith('gpt'));
@@ -339,12 +354,18 @@
             }
         });
 
-        function resetPrompt() {
+        function resetSystemPrompt() {
             document.getElementById('customPrompt').value = `당신은 전공 강의 자료를 분석하고 요약하는 전문 AI 조교입니다.
-[출력 규칙]
-1. **반드시 Markdown 형식**으로 작성
-2. **한국어** 사용
-3. 서론 없이 본론만 바로 작성`;
+    [출력 규칙]
+    1. **반드시 Markdown 형식**으로 작성
+    2. **한국어** 사용
+    3. 서론 없이 본론만 바로 작성`;
+        }
+
+        function resetUserPrompt() {
+            document.getElementById('customUserPrompt').value = `파일명: "{filename}"
+    이 슬라이드를 분석하여 핵심 주제, 시각 자료(도표/그림) 설명, 상세 내용을 마크다운으로 작성해 주세요.
+    제목은 "## {filename}" 형식을 사용하세요.`;
         }
 
         async function loadUsageInfo() {

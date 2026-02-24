@@ -37,16 +37,17 @@ def get_headers(api_key=None):
 def get_target_model(user_settings):
     pref = user_settings.get("preferred_model", "local")
     user_key = user_settings.get("openai_api_key", "")
-    # 사용자 커스텀 프롬프트 가져오기
+    
     system_prompt = user_settings.get("custom_prompt", "") 
+    user_prompt_template = user_settings.get("custom_user_prompt", "")
 
-    # 공통 반환값에 system_prompt 추가
     config = {
-        "model_id": "gpt-4o", # 기본값
+        "model_id": "gpt-4o", 
         "base_url": settings.CUSTOM_BASE_URL,
         "api_key": None,
         "provider": "local",
-        "system_prompt": system_prompt # [추가됨]
+        "system_prompt": system_prompt,
+        "user_prompt_template": user_prompt_template # [추가됨] 설정에 포함
     }
 
     if pref.startswith("gpt"):
@@ -59,7 +60,7 @@ def get_target_model(user_settings):
             "api_key": user_key
         })
     else:
-        # Local Server Logic
+        # Local Server Logic (생략 - 기존과 동일)
         try:
             url = f"{settings.CUSTOM_BASE_URL}/models"
             resp = requests.get(url, headers=get_headers(), timeout=5)
@@ -68,14 +69,11 @@ def get_target_model(user_settings):
                 if models:
                     config["model_id"] = models[0]["id"]
         except:
-            pass # 실패 시 기본값 유지
+            pass
 
     return config
 
 def describe_image(image_path: str, model_config: dict):
-    """
-    이미지를 분석하여 텍스트를 생성하는 함수 (재시도 로직 포함)
-    """
     filename = os.path.basename(image_path)
     url = f"{model_config['base_url']}/chat/completions"
     headers = get_headers(model_config['api_key'])
@@ -88,26 +86,20 @@ def describe_image(image_path: str, model_config: dict):
         mime = "image/png" if ext == ".png" else "image/jpeg"
         return f"data:{mime};base64,{encoded}"
 
-    default_system_instruction = """
-    당신은 전공 강의 자료를 분석하고 설명하는 전문 AI 조교입니다.
-    [출력 규칙]
-    1. **반드시 Markdown 형식**으로 작성
-    2. **한국어** 사용
-    3. 서론 없이 본론만 바로 작성
-    4. 이모티콘 사용 금지
-    """
-    
+    # 시스템 프롬프트 처리
+    default_system_instruction = "당신은 전공 강의 자료를 분석하고 설명하는 전문 AI 조교입니다..." # (줄임)
     system_instruction = model_config.get("system_prompt", default_system_instruction)
-
-    # (혹시라도 빈 문자열이 들어오면 기본값 사용)
     if not system_instruction.strip():
         system_instruction = default_system_instruction
 
-    user_instruction = f"""
-    파일명: "{filename}"
-    이 슬라이드를 분석하여 핵심 주제, 시각 자료(도표/그림) 설명, 상세 내용을 마크다운으로 작성해 주세요.
-    제목은 "## {filename}" 형식을 사용하세요.
-    """
+    default_user_instruction = '파일명: "{filename}"\n이 슬라이드를 분석하여...' # (줄임)
+    
+    user_template = model_config.get("user_prompt_template", "")
+    if not user_template or not user_template.strip():
+        user_template = default_user_instruction
+        
+    # {filename} 변수 치환 (사용자가 실수로 {filename}을 지웠을 경우 대비하여 replace 사용)
+    user_instruction = user_template.replace("{filename}", filename)
 
     payload = {
         "model": model_config['model_id'],
@@ -118,12 +110,9 @@ def describe_image(image_path: str, model_config: dict):
                 {"type": "image_url", "image_url": {"url": image_to_data_url(image_path)}}
             ]}
         ],
-        "max_completion_tokens": 3000, # 호환성이 좋은 max_tokens 사용
+        "max_completion_tokens": 3000,
     }
 
-    # -----------------------------------------------
-    # [수정] 재시도 루프 (Max 3회)
-    # -----------------------------------------------
     max_retries = 3
     for attempt in range(max_retries):
         try:

@@ -132,6 +132,7 @@ async def save_settings(
     audio_lang: str = Form("ko"),
     audio_model: str = Form("2"),
     custom_prompt: Optional[str] = Form(None),
+    custom_user_prompt: Optional[str] = Form(None),  
     profile_img: Optional[UploadFile] = File(None), 
     user: Any = Depends(get_current_user)
 ):
@@ -156,7 +157,7 @@ async def save_settings(
     # 2. 사용자 설정 및 프로필 URL 업데이트
     # AuthManager.update_user_settings에 profile_url 인자를 추가해서 호출
     success = AuthManager.update_user_settings(
-        user, api_key, model, audio_lang, int_audio_model, custom_prompt, profile_url
+        user, api_key, model, audio_lang, int_audio_model, custom_prompt, custom_user_prompt, profile_url
     )
     
     if success:

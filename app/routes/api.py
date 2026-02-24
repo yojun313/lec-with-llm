@@ -20,7 +20,6 @@ class VerifyRequest(BaseModel):
     code: str
 
 
-# [수정됨] 회원가입 요청 (인증 메일 발송)
 @router.post("/auth/signup/request")
 async def api_signup_request(
     username: str = Form(...), 
@@ -36,8 +35,7 @@ async def api_signup_request(
         raise HTTPException(status_code=400, detail="Email already exists")
     else:
         raise HTTPException(status_code=500, detail="Failed to send email")
-
-# [추가됨] 인증 코드 확인 및 가입 완료
+    
 @router.post("/auth/signup/verify")
 async def api_signup_verify(req: VerifyRequest):
     if AuthManager.verify_and_create_user(req.email, req.code):
@@ -65,7 +63,6 @@ async def api_login(username: str = Form(...), password: str = Form(...)):
     if session_id:
         response = JSONResponse(content={"message": "Login successful"})
         
-        # [수정됨] 쿠키 유효기간 설정 (7일 = 60*60*24*7 초)
         response.set_cookie(
             key="session_id", 
             value=session_id, 

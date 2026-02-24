@@ -39,7 +39,19 @@
                                 'h1, h2, h3': { color: '#fff', fontWeight: '700', marginTop: '1.2em', marginBottom: '0.6em' },
                                 'p': { marginTop: '0.5em', marginBottom: '0.5em' },
                                 strong: { color: '#fff' },
-                                code: { color: '#ff7b72', backgroundColor: '#3a3a3a', padding: '2px 4px', borderRadius: '4px' },
+                                
+                                // ▼▼▼ [여기 수정됨] code 스타일 수정 ▼▼▼
+                                code: { 
+                                    color: '#ff7b72', 
+                                    backgroundColor: '#3a3a3a', 
+                                    padding: '2px 4px', 
+                                    borderRadius: '4px',
+                                    fontWeight: '600',     /* 폰트 굵기 조정 (선택사항) */
+                                    '&::before': { content: '"" !important' }, /* 시작 백틱 제거 */
+                                    '&::after': { content: '"" !important' }   /* 끝 백틱 제거 */
+                                },
+                                // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
+    
                                 pre: { backgroundColor: '#1e1e1e', border: '1px solid #333' },
                                 blockquote: { borderLeftColor: '#3b82f6', backgroundColor: '#262626' },
                             }
@@ -49,7 +61,6 @@
             }
         }
     </script>
-
     <style>
         ::-webkit-scrollbar { width: 8px; height: 8px; }
         ::-webkit-scrollbar-thumb { background: #4a4a4a; border-radius: 4px; }

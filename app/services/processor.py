@@ -47,7 +47,7 @@ def get_target_model(user_settings):
         "api_key": None,
         "provider": "local",
         "system_prompt": system_prompt,
-        "user_prompt_template": user_prompt_template # [추가됨] 설정에 포함
+        "user_prompt_template": user_prompt_template
     }
 
     if pref.startswith("gpt"):
@@ -60,7 +60,6 @@ def get_target_model(user_settings):
             "api_key": user_key
         })
     else:
-        # Local Server Logic (생략 - 기존과 동일)
         try:
             url = f"{settings.CUSTOM_BASE_URL}/models"
             resp = requests.get(url, headers=get_headers(), timeout=5)
@@ -87,18 +86,28 @@ def describe_image(image_path: str, model_config: dict):
         return f"data:{mime};base64,{encoded}"
 
     # 시스템 프롬프트 처리
-    default_system_instruction = "당신은 전공 강의 자료를 분석하고 설명하는 전문 AI 조교입니다..." # (줄임)
+    default_system_instruction = """
+    당신은 전공 강의 자료를 분석하고 설명하는 전문 AI 조교입니다.
+    [출력 규칙]
+    1. **반드시 Markdown 형식**으로 작성
+    2. **한국어** 사용
+    3. 서론 없이 본론만 바로 작성
+    4. 이모티콘 사용 금지
+    """
     system_instruction = model_config.get("system_prompt", default_system_instruction)
     if not system_instruction.strip():
         system_instruction = default_system_instruction
 
-    default_user_instruction = '파일명: "{filename}"\n이 슬라이드를 분석하여...' # (줄임)
+    default_user_instruction = f"""
+    파일명: "{filename}"
+    이 슬라이드를 분석하여 핵심 주제, 시각 자료(도표/그림) 설명, 상세 내용을 마크다운으로 작성해 주세요.
+    제목은 "## {filename}" 형식을 사용하세요.
+    """
     
     user_template = model_config.get("user_prompt_template", "")
     if not user_template or not user_template.strip():
         user_template = default_user_instruction
         
-    # {filename} 변수 치환 (사용자가 실수로 {filename}을 지웠을 경우 대비하여 replace 사용)
     user_instruction = user_template.replace("{filename}", filename)
 
     payload = {
@@ -158,7 +167,7 @@ def describe_image(image_path: str, model_config: dict):
         except Exception as e:
             print(f"[Exception] {str(e)}")
             if attempt == max_retries - 1:
-                raise e # 마지막 시도였으면 에러 전파
+                raise e
             time.sleep(2)
 
     # 반복문이 끝날 때까지 성공 못하면 에러 처리
@@ -253,7 +262,7 @@ def _process_job_internal(job_id: str, file_path: str, model_config: dict):
                                 cumulative_usage[k] += usage[k]
                             completed_count += 1
                             
-                            # [추가됨] 실시간 비용 계산
+                            # 실시간 비용 계산
                             usd_val, krw_val = calculate_total_cost(model_config['model_id'], cumulative_usage)
                             cur_tokens = cumulative_usage['prompt'] + cumulative_usage['completion']
                             

@@ -9,10 +9,6 @@ from app.core.config import settings
 from app.services.job_manager import JobManager
 from app.services.auth_manager import AuthManager
 
-# PPT 처리와 락을 공유할지, 따로 쓸지 결정. 
-# 여기서는 서버 부하 조절을 위해 별도 락을 사용하거나, 
-# processor.py의 task_lock을 import해서 공유할 수도 있습니다.
-# 편의상 오디오 전용 락을 생성합니다.
 audio_lock = threading.Lock()
 
 def process_audio_task(job_id: str, file_path: str):

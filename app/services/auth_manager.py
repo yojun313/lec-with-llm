@@ -69,7 +69,6 @@ class AuthManager:
             "password": hashed_pw,
             "email": email,
             "verified": True,
-            # 기본 설정값 초기화
             "openai_api_key": "",
             "preferred_model": "local",
             "audio_language": "auto",
@@ -85,9 +84,6 @@ class AuthManager:
 
     @staticmethod
     def create_user(username, password):
-        """
-        (관리자용 등) 이메일 인증 없이 바로 유저 생성 시 사용
-        """
         if users_col.find_one({"username": username}):
             return False
         
@@ -97,8 +93,8 @@ class AuthManager:
         new_user = {
             "username": username,
             "password": hashed_pw,
-            "email": "", # 이메일 없음
-            "verified": False, # 인증 안됨
+            "email": "", 
+            "verified": False,
             "openai_api_key": "",
             "preferred_model": "local",
             "audio_language": "auto",
@@ -145,7 +141,6 @@ class AuthManager:
 
     @staticmethod
     def update_user_settings(username, api_key, model_choice, audio_lang="auto", audio_model=2, custom_prompt=None, custom_user_prompt=None, profile_url=None):
-        # [수정됨] custom_user_prompt 인자 추가
         update_data = {
             "openai_api_key": api_key,
             "preferred_model": model_choice,
@@ -172,14 +167,12 @@ class AuthManager:
     def get_user_settings(username):
         user = users_col.find_one({"username": username})
         
-        # 기본 시스템 프롬프트
         default_system_prompt = """당신은 전공 강의 자료를 분석하고 요약하는 전문 AI 조교입니다.
 [출력 규칙]
 1. **반드시 Markdown 형식**으로 작성
 2. **한국어** 사용
 3. 서론 없이 본론만 바로 작성"""
 
-        # [추가됨] 기본 유저 프롬프트 정의 ({filename}은 치환될 변수임)
         default_user_prompt = """파일명: "{filename}"
 이 슬라이드를 분석하여 핵심 주제, 시각 자료(도표/그림) 설명, 상세 내용을 마크다운으로 작성해 주세요.
 제목은 "## {filename}" 형식을 사용하세요."""
@@ -191,7 +184,6 @@ class AuthManager:
                 "audio_language": user.get("audio_language", "auto"),
                 "audio_model_level": user.get("audio_model_level", 2),
                 "custom_prompt": user.get("custom_prompt", default_system_prompt),
-                # [추가됨] DB에서 가져오거나 기본값 사용
                 "custom_user_prompt": user.get("custom_user_prompt", default_user_prompt),
                 "profile_img": user.get("profile_img", "/static/default_avatar.png")
             }
@@ -202,7 +194,7 @@ class AuthManager:
             "audio_language": "auto",
             "audio_model_level": 2,
             "custom_prompt": default_system_prompt,
-            "custom_user_prompt": default_user_prompt # [추가됨]
+            "custom_user_prompt": default_user_prompt
         }
     
     @staticmethod

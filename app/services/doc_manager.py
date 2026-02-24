@@ -12,7 +12,6 @@ class DocManager:
     
     @staticmethod
     def get_zip_path(owner: str, doc_id: str):
-        # MongoDB에서 문서 정보 조회
         target = docs_col.find_one({"id": doc_id, "owner": owner})
         
         if not target or target["type"] != "file":
@@ -76,9 +75,6 @@ class DocManager:
                 shutil.rmtree(extract_path)
             raise e
 
-        # =========================================================
-        # [추가된 로직] 폴더 구조 자동 보정 (Flatten)
-        # =========================================================
         # 만약 최상위에 result.md가 없고, 폴더가 하나만 있다면 그 안으로 들어가서 꺼내옵니다.
         if not os.path.exists(os.path.join(extract_path, "result.md")):
             
@@ -126,6 +122,7 @@ class DocManager:
         docs_col.insert_one(new_doc)
         new_doc.pop("_id", None)
         return new_doc
+    
     @staticmethod
     def delete_node(owner: str, node_id: str):
         # 삭제할 노드 찾기

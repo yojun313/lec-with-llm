@@ -9,8 +9,8 @@ def send_verification_email(receiver: str, code: str):
     sender = settings.MAIL_SENDER
     password = settings.MAIL_PASSWORD
     
-    title = "[AI PPT] 회원가입 인증 코드"
-    text = f"아래 인증 코드를 입력하여 회원가입을 완료해주세요.\n\n인증 코드: {code}\n\n감사합니다."
+    title = "[LecAI] 회원가입 인증 코드"
+    text = f"아래 인증 코드를 입력하여 회원가입을 완료해주세요.\n\n인증 코드: {code}."
 
     msg = MIMEMultipart()
     msg['Subject'] = title

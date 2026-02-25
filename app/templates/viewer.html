@@ -781,21 +781,44 @@
             
             const slide = tab.slides[tab.currentIndex];
             
+            // 1. 이미지 처리
             if (slide.image) {
-                slideImage.src = slide.image; slideImage.classList.remove('hidden'); noImageText.classList.add('hidden');
+                slideImage.src = slide.image; 
+                slideImage.classList.remove('hidden'); 
+                noImageText.classList.add('hidden');
             } else {
-                slideImage.classList.add('hidden'); noImageText.classList.remove('hidden');
+                slideImage.classList.add('hidden'); 
+                noImageText.classList.remove('hidden');
             }
-
-            slideText.innerHTML = slide.htmlParts.join('');
+        
+            // 2. 텍스트 처리
+            let rawHtml = slide.htmlParts.join('');
+        
+            // (기존) 아래첨자 처리: x_L -> $x_{L}$
+            rawHtml = rawHtml.replace(/\b([a-zA-Z])_([a-zA-Z0-9]+)\b/g, '$$$1_{$2}$$');
+        
+            // [추가] 위첨자(제곱) 처리: n^2, n^[n/2], n^~~ 등
+            // 설명: 
+            // 1. ([a-zA-Z0-9]+) : 영문자나 숫자로 된 밑 (예: n, 2, x)
+            // 2. \^             : 실제 ^ 기호
+            // 3. (...)          : 지수 부분. 다음 세 가지 경우를 모두 잡습니다.
+            //    - [a-zA-Z0-9\.~]+  : 일반 문자, 숫자, 점(.), 물결(~) (예: 2, ~~)
+            //    - \[[^\]]+\]       : 대괄호로 묶인 것 (예: [n/2])
+            //    - \([^)]+\)        : 소괄호로 묶인 것 (예: (n-1))
+            rawHtml = rawHtml.replace(/([a-zA-Z0-9]+)\^([a-zA-Z0-9\.~]+|\[[^\]]+\]|\([^)]+\)|\{[^}]+\})/g, '$$$1^{$2}$$');
+        
+            slideText.innerHTML = rawHtml;
+            
+            // 3. 수식 렌더링
             postprocessMath(slideText, tab.mathMap);
-
+        
+            // 4. 네비게이션 상태 업데이트
             pageIndicator.textContent = `${tab.currentIndex + 1} / ${tab.slides.length}`;
             prevSlideBtn.disabled = tab.currentIndex === 0;
             nextSlideBtn.disabled = tab.currentIndex === tab.slides.length - 1;
             slideTextContainer.scrollTop = 0;
         }
-
+        
         prevSlideBtn.addEventListener('click', () => { 
             const tab = getActiveTab();
             if (tab && tab.currentIndex > 0) { tab.currentIndex--; renderCurrentSlide(); saveSession(); } 

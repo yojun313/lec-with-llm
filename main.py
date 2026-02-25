@@ -1,23 +1,29 @@
+# main.py
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
-from app.routes import api, views, docs
-from app.core.config import settings
 from fastapi.responses import FileResponse
+from app.core.config import settings
+from app.routes import view_routes, auth_routes, job_routes, user_routes, doc_routes, lms_routes
+import os
 
 app = FastAPI(title="LecAI")
 
 @app.get("/favicon.ico", include_in_schema=False)
 async def favicon():
-    # static 폴더 안에 있는 favicon.ico 파일을 반환합니다.
     return FileResponse(os.path.join("static", "favicon.ico"))
     
 # 정적 파일 마운트
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# 라우터 등록
-app.include_router(views.router)
-app.include_router(docs.router)
-app.include_router(api.router, prefix="/api")
+# View 라우터 (HTML 페이지) - Root 레벨
+app.include_router(view_routes.router)
+app.include_router(lms_routes.router)
+
+# API 라우터 그룹 - /api 프리픽스 아래로 통합
+app.include_router(auth_routes.router, prefix="/api", tags=["Auth"])
+app.include_router(job_routes.router, prefix="/api", tags=["Jobs"])
+app.include_router(user_routes.router, prefix="/api", tags=["User"])
+app.include_router(doc_routes.router, prefix="/api", tags=["Docs"])
 
 if __name__ == "__main__":
     import uvicorn

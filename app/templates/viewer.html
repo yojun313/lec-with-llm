@@ -18,38 +18,36 @@
     
     <script>
         tailwind.config = {
-            darkMode: 'class',
+            darkMode: 'class', // 클래스 기반 다크모드 필수
             theme: {
                 extend: {
                     colors: {
                         notion: {
-                            bg: '#191919',
-                            sidebar: '#202020',
-                            hover: '#2c2c2c',
-                            border: '#333333',
-                            text: '#e5e5e5',
-                            muted: '#a0a0a0'
+                            bg: 'var(--bg-primary)',
+                            sidebar: 'var(--bg-secondary)',
+                            hover: 'var(--bg-hover)',
+                            border: 'var(--border-color)',
+                            text: 'var(--text-primary)',
+                            muted: 'var(--text-muted)'
                         }
                     },
                     typography: (theme) => ({
                         DEFAULT: {
                             css: {
-                                color: theme('colors.notion.text'),
+                                color: 'var(--text-primary)',
                                 maxWidth: 'none',
-                                'h1, h2, h3': { color: '#fff', fontWeight: '700', marginTop: '1.2em', marginBottom: '0.6em' },
-                                'p': { marginTop: '0.5em', marginBottom: '0.5em' },
-                                strong: { color: '#fff' },
-                                code: { 
+                                'h1, h2, h3, strong': { color: 'var(--text-primary)' }, // 제목 등도 변수 사용
+                                'code': { 
                                     color: '#ff7b72', 
-                                    backgroundColor: '#3a3a3a', 
+                                    backgroundColor: 'var(--bg-hover)', 
                                     padding: '2px 4px', 
                                     borderRadius: '4px',
                                     fontWeight: '600',
                                     '&::before': { content: '"" !important' },
                                     '&::after': { content: '"" !important' }
                                 },
-                                pre: { backgroundColor: '#1e1e1e', border: '1px solid #333' },
-                                blockquote: { borderLeftColor: '#3b82f6', backgroundColor: '#262626' },
+                                pre: { backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-color)' },
+                                blockquote: { borderLeftColor: '#3b82f6', backgroundColor: 'var(--bg-secondary)', color: 'var(--text-muted)' },
                             }
                         }
                     })
@@ -58,10 +56,43 @@
         }
     </script>
     <style>
+        :root {
+            /* 라이트 모드 (Notion 스타일) */
+            --bg-primary: #ffffff;
+            --bg-secondary: #f7f7f5;
+            --bg-hover: #e0e0e0;
+            --border-color: #e0e0e0;
+            --text-primary: #37352f;
+            --text-muted: #9b9a97;
+        }
+        
+        html.dark {
+            /* 다크 모드 (기존 색상) */
+            --bg-primary: #191919;
+            --bg-secondary: #202020;
+            --bg-hover: #2c2c2c;
+            --border-color: #333333;
+            --text-primary: #e5e5e5;
+            --text-muted: #a0a0a0;
+        }
+
+        /* 공통 트랜지션 */
+        body, aside, header, div, span, button, i, .tab-item {
+            transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+        }
+
         ::-webkit-scrollbar { width: 8px; height: 8px; }
-        ::-webkit-scrollbar-thumb { background: #4a4a4a; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb { background: var(--text-muted); border-radius: 4px; opacity: 0.5; }
         ::-webkit-scrollbar-track { background: transparent; }
-        .katex-display { background: #262626; padding: 1rem; border-radius: 0.5rem; border: 1px solid #333; overflow-x: auto; margin: 1rem 0; }
+        
+        .katex-display { 
+            background: var(--bg-hover);
+            padding: 1rem; 
+            border-radius: 0.5rem; 
+            border: 1px solid var(--border-color);
+            overflow-x: auto; 
+            margin: 1rem 0; 
+        }
         
         #dragOverlay { transition: all 0.2s ease; opacity: 0; visibility: hidden; pointer-events: none; z-index: 9999; }
         #dragOverlay.active { opacity: 1; visibility: visible; pointer-events: auto; }
@@ -79,28 +110,24 @@
         
         .split-image-container {
             width: 50%; height: 100%;
-            background-color: #000;
+            background-color: var(--bg-secondary);
             display: flex; align-items: center; justify-content: center;
-            padding: 1rem; border-right: 1px solid #333; position: relative;
+            padding: 1rem; 
+            border-right: 1px solid var(--border-color);
+            position: relative;
         }
-        .split-image-container img {
-            max-width: 100%; max-height: 100%;
-            object-fit: contain;
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
-        }
-
         .split-text-container {
             width: 50%; height: 100%;
             overflow-y: auto;
             padding: 3rem 4rem;
             padding-bottom: 8rem;
-            background-color: #191919;
+            background-color: var(--bg-primary);
         }
         .split-text-container > article > *:first-child { margin-top: 0 !important; }
 
         @media (max-width: 1024px) {
             #presentationView.active { flex-direction: column; }
-            .split-image-container { width: 100%; height: 40%; border-right: none; border-bottom: 1px solid #333; }
+            .split-image-container { width: 100%; height: 40%; border-right: none; border-bottom: 1px solid var(--border-color); }
             .split-text-container { width: 100%; height: 60%; padding: 2rem; }
         }
 
@@ -109,27 +136,22 @@
             display: flex; align-items: center;
             padding: 0.5rem 1rem;
             font-size: 0.875rem;
-            color: #a0a0a0;
-            background-color: #202020;
-            border-right: 1px solid #333;
+            color: var(--text-muted);
+            background-color: var(--bg-secondary);
+            border-right: 1px solid var(--border-color);
             cursor: pointer;
             user-select: none;
             max-width: 200px;
             min-width: 120px;
-            transition: background-color 0.2s;
         }
-        .tab-item:hover { background-color: #2c2c2c; }
+        .tab-item:hover { background-color: var(--bg-hover); }
         .tab-item.active {
-            background-color: #191919;
-            color: #fff;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
             border-top: 2px solid #3b82f6;
         }
-        .tab-close {
-            margin-left: auto;
-            padding: 2px;
-            border-radius: 4px;
-        }
-        .tab-close:hover { background-color: #444; color: #ff7b72; }
+        .tab-close { margin-left: auto; padding: 2px; border-radius: 4px; }
+        .tab-close:hover { background-color: var(--bg-hover); color: #ff7b72; }
 
         /* Fullscreen Mode Styles */
         body.fullscreen-mode #sidebar { display: none !important; }
@@ -138,55 +160,26 @@
         body.fullscreen-mode #exitFullscreenBtn { display: flex !important; }
         body.fullscreen-mode main { height: 100vh !important; }
 
-        /* --- Tree View Styles --- */
-        .tree-node {
-            user-select: none;
-        }
+        /* Tree View Styles */
+        .tree-node { user-select: none; }
         .tree-content {
-            display: flex;
-            align-items: center;
-            padding: 0.25rem 0.5rem;
-            cursor: pointer;
-            color: #e5e5e5;
-            transition: background-color 0.2s;
-            border-radius: 4px;
+            display: flex; align-items: center; padding: 0.25rem 0.5rem; cursor: pointer;
+            color: var(--text-primary); /* 수정됨 */
+            transition: background-color 0.2s; border-radius: 4px;
         }
-        .tree-content:hover {
-            background-color: #2c2c2c;
-        }
-        .tree-content.active {
-            background-color: #374151; /* 선택된 파일 강조 */
-            color: #60a5fa; /* blue-400 */
-        }
+        .tree-content:hover { background-color: var(--bg-hover); }
+        .tree-content.active { background-color: var(--bg-hover); color: #3b82f6; }
         .tree-arrow {
-            width: 1rem;
-            height: 1rem;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin-right: 0.25rem;
-            transition: transform 0.2s ease;
-            font-size: 0.7rem;
-            color: #a0a0a0;
+            width: 1rem; height: 1rem; display: flex; align-items: center; justify-content: center;
+            margin-right: 0.25rem; transition: transform 0.2s ease; font-size: 0.7rem; color: var(--text-muted);
         }
-        .tree-arrow.expanded {
-            transform: rotate(90deg);
-        }
-        .tree-children {
-            display: none;
-            margin-left: 0.5rem;     /* 들여쓰기 가이드라인 */
-            border-left: 1px solid #333; /* 가이드라인 선 */
-        }
-        .tree-children.show {
-            display: block;
-        }
-        /* 폴더인데 자식이 없는 경우 등 화살표 숨김용 */
-        .invisible {
-            visibility: hidden;
-        }
+        .tree-arrow.expanded { transform: rotate(90deg); }
+        .tree-children { display: none; margin-left: 0.5rem; border-left: 1px solid var(--border-color); }
+        .tree-children.show { display: block; }
+        .invisible { visibility: hidden; }
     </style>
 </head>
-<body class="bg-notion-bg text-notion-text font-sans h-screen flex overflow-hidden relative">
+<body class="bg-notion-bg text-notion-text font-sans h-screen flex overflow-hidden relative transition-colors duration-300">
 
     <div id="sidebarOverlay" class="fixed inset-0 bg-black/50 z-40 hidden transition-opacity duration-300 opacity-0 md:hidden"></div>
 
@@ -198,22 +191,22 @@
 
     <aside id="sidebar" class="fixed inset-y-0 left-0 z-50 w-72 bg-notion-sidebar border-r border-notion-border flex flex-col md:relative transform -translate-x-full md:translate-x-0 flex-shrink-0">
         <div class="p-4 flex justify-between items-center bg-notion-sidebar group">
-            <h1 class="text-xl font-bold text-white tracking-tight flex items-center truncate">
+            <h1 class="text-xl font-bold text-notion-text tracking-tight flex items-center truncate">
                 <i class="fas fa-book-open text-blue-500 mr-2.5"></i>Viewer
             </h1>
             <div class="flex items-center space-x-1">
-                <a href="/" class="hidden md:block text-xs bg-notion-hover px-2 py-1 rounded hover:bg-[#3a3a3a] transition">Dash</a>
-                <button id="hideSidebarBtn" class="hidden md:flex text-notion-muted hover:text-white p-1 rounded hover:bg-notion-hover transition" title="사이드바 접기">
+                <a href="/" class="hidden md:block text-xs bg-notion-hover px-2 py-1 rounded hover:bg-notion-hover transition">Dash</a>
+                <button id="hideSidebarBtn" class="hidden md:flex text-notion-muted hover:text-notion-text p-1 rounded hover:bg-notion-hover transition" title="사이드바 접기">
                     <i class="fas fa-angles-left"></i>
                 </button>
-                <button id="closeSidebarBtn" class="md:hidden text-notion-muted hover:text-white px-2"><i class="fas fa-times text-xl"></i></button>
+                <button id="closeSidebarBtn" class="md:hidden text-notion-muted hover:text-notion-text px-2"><i class="fas fa-times text-xl"></i></button>
             </div>
         </div>
         <div class="px-2 pb-2 flex space-x-1">
-            <button onclick="createFolder()" class="bg-notion-hover hover:bg-[#3a3a3a] text-notion-muted hover:text-white py-1.5 px-2 rounded border border-notion-border transition" title="새 폴더">
+            <button onclick="createFolder()" class="bg-notion-hover hover:bg-opacity-80 text-notion-muted hover:text-notion-text py-1.5 px-2 rounded border border-notion-border transition" title="새 폴더">
                 <i class="fas fa-folder-plus"></i>
             </button>
-            <button onclick="openHistoryModal()" class="flex-1 bg-notion-hover hover:bg-[#3a3a3a] text-sm py-1.5 rounded border border-notion-border text-notion-text transition">
+            <button onclick="openHistoryModal()" class="flex-1 bg-notion-hover hover:bg-opacity-80 text-sm py-1.5 rounded border border-notion-border text-notion-text transition">
                 <i class="fas fa-history mr-1 text-purple-400"></i> 불러오기
             </button>
             <button onclick="document.getElementById('zipInput').click()" class="flex-1 bg-blue-600/90 hover:bg-blue-600 text-white text-sm py-1.5 rounded shadow-md" id="uploadBtn">
@@ -229,37 +222,40 @@
 
     <main class="flex-1 flex flex-col h-full relative overflow-hidden bg-notion-bg min-w-0">
         <header class="h-14 bg-notion-bg border-b border-notion-border flex items-center justify-between px-4 md:px-6 flex-shrink-0 z-30">
-            <button id="openSidebarBtn" class="text-notion-muted hover:text-white mr-4 flex items-center">
+            <button id="openSidebarBtn" class="text-notion-muted hover:text-notion-text mr-4 flex items-center">
                 <i class="fas fa-bars text-xl"></i>
             </button>
 
             <div class="flex-1 flex justify-end items-center space-x-2" id="toolbar" style="display: none;">
+                <button onclick="toggleTheme()" class="text-notion-text bg-notion-hover border border-notion-border w-9 h-9 flex items-center justify-center rounded hover:bg-opacity-80 transition shadow-sm mr-2" title="테마 변경">
+                    <i id="themeIcon" class="fas fa-moon"></i>
+                </button>
                 <button id="copyImageBtn" onclick="copySlideImage()" class="hidden items-center justify-center w-8 h-8 mr-2 text-notion-muted hover:text-blue-400 bg-notion-hover border border-notion-border rounded transition" title="슬라이드 이미지 복사">
                     <i class="far fa-copy" id="copyIcon"></i>
                 </button>
 
                 <div id="zoomControls" class="flex items-center bg-notion-hover rounded border border-notion-border mr-2 transition-opacity duration-200">
-                    <button onclick="adjustFontSize(-10)" class="px-3 py-1.5 text-notion-muted hover:text-white hover:bg-[#3a3a3a] border-r border-notion-border transition rounded-l" title="축소">
+                    <button onclick="adjustFontSize(-10)" class="px-3 py-1.5 text-notion-muted hover:text-notion-text hover:bg-opacity-80 border-r border-notion-border transition rounded-l" title="축소">
                         <i class="fas fa-minus text-xs"></i>
                     </button>
                     <span id="zoomDisplay" class="px-3 text-xs font-mono text-notion-text min-w-[3.5rem] text-center select-none">100%</span>
-                    <button onclick="adjustFontSize(10)" class="px-3 py-1.5 text-notion-muted hover:text-white hover:bg-[#3a3a3a] transition rounded-r" title="확대">
+                    <button onclick="adjustFontSize(10)" class="px-3 py-1.5 text-notion-muted hover:text-notion-text hover:bg-opacity-80 transition rounded-r" title="확대">
                         <i class="fas fa-plus text-xs"></i>
                     </button>
                 </div>
                 
-                <button id="fullscreenBtn" onclick="toggleFullScreen()" class="text-notion-text bg-notion-hover border border-notion-border w-9 h-9 flex items-center justify-center rounded hover:bg-[#3a3a3a] transition shadow-sm mr-2" title="전체 화면">
+                <button id="fullscreenBtn" onclick="toggleFullScreen()" class="text-notion-text bg-notion-hover border border-notion-border w-9 h-9 flex items-center justify-center rounded hover:bg-opacity-80 transition shadow-sm mr-2" title="전체 화면">
                     <i class="fas fa-expand"></i>
                 </button>
 
-                <button id="viewModeBtn" class="text-notion-text bg-notion-hover border border-notion-border px-3 py-1.5 rounded text-sm flex items-center gap-2 hover:bg-[#3a3a3a] transition shadow-sm">
+                <button id="viewModeBtn" class="text-notion-text bg-notion-hover border border-notion-border px-3 py-1.5 rounded text-sm flex items-center gap-2 hover:bg-opacity-80 transition shadow-sm">
                     <i class="fas fa-desktop"></i> <span>프레젠테이션 모드</span>
                 </button>
             </div>
         </header>
         
-        <div id="tabBar" class="flex items-center bg-[#202020] border-b border-notion-border overflow-x-auto custom-scrollbar h-10 hidden flex-shrink-0">
-            </div>
+        <div id="tabBar" class="flex items-center bg-notion-sidebar border-b border-notion-border overflow-x-auto custom-scrollbar h-10 hidden flex-shrink-0">
+        </div>
 
         <div id="emptyView" class="flex-1 flex flex-col items-center justify-center text-notion-muted select-none p-4 text-center">
             <i class="far fa-file-alt text-6xl mb-6 opacity-20"></i>
@@ -267,7 +263,7 @@
         </div>
 
         <div id="scrollView" class="flex-1 overflow-y-auto hidden custom-scrollbar relative">
-            <article id="markdownBody" class="max-w-4xl mx-auto px-8 py-12 prose prose-invert prose-lg"></article>
+            <article id="markdownBody" class="max-w-4xl mx-auto px-8 py-12 prose prose-lg max-w-none dark:prose-invert"></article>
         </div>
 
         <div id="presentationView">
@@ -279,15 +275,15 @@
                 </div>
             </div>
             <div class="split-text-container custom-scrollbar" id="slideTextContainer">
-                <article id="slideText" class="prose prose-invert prose-lg max-w-none"></article>
+                <article id="slideText" class="prose prose-lg max-w-none dark:prose-invert"></article>
             </div>
             
-            <div class="absolute bottom-8 left-1/2 transform -translate-x-1/2 bg-[#252525] border border-notion-border rounded-full shadow-2xl px-6 py-3 flex items-center space-x-8 z-50">
+            <div class="absolute bottom-8 left-1/2 transform -translate-x-1/2 bg-notion-sidebar border border-notion-border rounded-full shadow-2xl px-6 py-3 flex items-center space-x-8 z-50">
                 <button id="prevSlideBtn" class="text-notion-text hover:text-blue-400 disabled:opacity-20 transition-all">
                     <i class="fas fa-chevron-left text-xl"></i>
                 </button>
                 <div class="flex flex-col items-center min-w-[80px]">
-                    <span id="pageIndicator" class="font-bold text-white text-lg">1 / 1</span>
+                    <span id="pageIndicator" class="font-bold text-notion-text text-lg">1 / 1</span>
                     <span class="text-[10px] text-notion-muted uppercase tracking-widest">Slide</span>
                 </div>
                 <button id="nextSlideBtn" class="text-notion-text hover:text-blue-400 disabled:opacity-20 transition-all">
@@ -303,11 +299,11 @@
 
     <div id="historyModal" class="fixed inset-0 bg-black/70 z-[100] hidden flex items-center justify-center opacity-0 transition-opacity duration-200">
         <div class="bg-notion-sidebar border border-notion-border w-full max-w-2xl rounded-xl shadow-2xl flex flex-col max-h-[80vh] transform scale-95 transition-transform duration-200" id="historyModalContent">
-            <div class="px-6 py-4 border-b border-notion-border flex justify-between items-center bg-[#252525] rounded-t-xl">
-                <h2 class="text-lg font-bold text-white flex items-center">
+            <div class="px-6 py-4 border-b border-notion-border flex justify-between items-center bg-notion-sidebar rounded-t-xl">
+                <h2 class="text-lg font-bold text-notion-text flex items-center">
                     <i class="fas fa-history text-purple-400 mr-2"></i> 작업 내역 불러오기
                 </h2>
-                <button onclick="closeHistoryModal()" class="text-notion-muted hover:text-white transition">
+                <button onclick="closeHistoryModal()" class="text-notion-muted hover:text-notion-text transition">
                     <i class="fas fa-times text-xl"></i>
                 </button>
             </div>
@@ -319,9 +315,9 @@
                 </div>
             </div>
     
-            <div class="px-6 py-3 border-t border-notion-border bg-[#252525] rounded-b-xl text-right">
+            <div class="px-6 py-3 border-t border-notion-border bg-notion-sidebar rounded-b-xl text-right">
                 <span class="text-xs text-notion-muted mr-2">완료된 작업만 표시됩니다.</span>
-                <button onclick="closeHistoryModal()" class="px-4 py-2 bg-notion-hover hover:bg-[#3a3a3a] text-sm text-white rounded border border-notion-border">
+                <button onclick="closeHistoryModal()" class="px-4 py-2 bg-notion-hover hover:bg-opacity-80 text-sm text-notion-text rounded border border-notion-border">
                     닫기
                 </button>
             </div>
@@ -332,17 +328,43 @@
         // ==========================================
         // 1. Global State & Config
         // ==========================================
-        let viewMode = 'presentation'; 
+        const themeIcon = document.getElementById('themeIcon');
+
+        // 초기화: 저장된 설정 불러오기 (기본값: dark)
+        function initTheme() {
+            const savedTheme = localStorage.getItem('theme');
+            if (savedTheme === 'light') {
+                document.documentElement.classList.remove('dark');
+                if(themeIcon) themeIcon.className = 'fas fa-sun text-orange-400';
+            } else {
+                document.documentElement.classList.add('dark');
+                if(themeIcon) themeIcon.className = 'fas fa-moon';
+            }
+        }
+
+        // 토글 함수
+        function toggleTheme() {
+            const html = document.documentElement;
+            if (html.classList.contains('dark')) {
+                html.classList.remove('dark');
+                localStorage.setItem('theme', 'light');
+                if(themeIcon) themeIcon.className = 'fas fa-sun text-orange-400';
+            } else {
+                html.classList.add('dark');
+                localStorage.setItem('theme', 'dark');
+                if(themeIcon) themeIcon.className = 'fas fa-moon';
+            }
+        }
+
+        // 실행
+        initTheme();
         
-        // 탭 상태
+        let viewMode = 'presentation'; 
         let openedTabs = []; 
         let activeTabId = null;
+        let expandedFolderIds = new Set(); 
+        let activeFileId = null;           
 
-        // 트리 뷰 상태
-        let expandedFolderIds = new Set(); // 펼쳐진 폴더 ID 저장
-        let activeFileId = null;           // 현재 선택된 파일 ID
-
-        // DOM Elements
         const nodeList = document.getElementById('nodeList');
         const zipInput = document.getElementById('zipInput');
         const dragOverlay = document.getElementById('dragOverlay');
@@ -368,187 +390,126 @@
         const zoomDisplay = document.getElementById('zoomDisplay');
         const body = document.body;
 
-        // Markdown / MathJax Config
         marked.setOptions({ breaks: true, gfm: true });
 
         // ==========================================
         // 2. Initialization
         // ==========================================
-        
-        // 사이드바 상태 복구
         if (localStorage.getItem('sidebarClosed') === 'true') {
             body.classList.add('sidebar-closed');
         }
-
-        // 트리 펼침 상태 복구
         const savedExpanded = localStorage.getItem('viewer_expanded_folders');
         if (savedExpanded) {
-            try {
-                expandedFolderIds = new Set(JSON.parse(savedExpanded));
-            } catch(e) { console.error(e); }
+            try { expandedFolderIds = new Set(JSON.parse(savedExpanded)); } catch(e) { console.error(e); }
         }
 
-        // 초기 실행
-        loadTreeRoot();   // 트리 로드
-        restoreSession(); // 탭 세션 복구
+        loadTreeRoot();   
+        restoreSession(); 
 
         // ==========================================
-        // 3. Tree View Logic (VS Code Style)
+        // 3. Tree View Logic
         // ==========================================
-
-        // 3-1. 루트 폴더 로드
         async function loadTreeRoot() {
-            nodeList.innerHTML = ''; // 초기화
+            nodeList.innerHTML = ''; 
             try {
                 const res = await fetch(`/api/docs/nodes?parent_id=root`);
                 if (!res.ok) throw new Error("Fetch failed");
                 const nodes = await res.json();
-                
-                // 루트 레벨 렌더링 (Depth 0, ParentName 'root')
                 await renderTreeNodes(nodes, nodeList, 0, 'root');
             } catch (err) {
-                console.error(err);
                 nodeList.innerHTML = '<div class="text-xs text-red-400 p-4">로드 실패</div>';
             }
         }
 
-        // 3-2. 노드 리스트 렌더링
         async function renderTreeNodes(nodes, container, depth, parentName) {
-            // 폴더 우선 정렬 -> 이름 오름차순
             nodes.sort((a, b) => {
                 if (a.type === b.type) return a.name.localeCompare(b.name);
                 return a.type === 'folder' ? -1 : 1;
             });
-
             for (const node of nodes) {
                 const nodeEl = createTreeNodeElement(node, depth, parentName);
                 container.appendChild(nodeEl);
-
-                // 이미 펼쳐진 상태라면 자식 로드
                 if (node.type === 'folder' && expandedFolderIds.has(node.id)) {
                     const arrow = nodeEl.querySelector('.tree-arrow');
                     const childrenContainer = nodeEl.querySelector('.tree-children');
-                    
                     arrow.classList.add('expanded');
                     childrenContainer.classList.add('show');
-                    
-                    // 자식 데이터 로드
                     await loadFolderChildren(node.id, childrenContainer, depth + 1, node.name);
                 }
             }
         }
 
-        // 3-3. 개별 노드 HTML 생성
         function createTreeNodeElement(node, depth, parentName) {
             const isFolder = node.type === 'folder';
             const wrapper = document.createElement('div');
             wrapper.className = 'tree-node';
-            
-            // 아이콘 결정
             let iconClass = isFolder ? 'fas fa-folder text-yellow-500' : 'fas fa-file-lines text-blue-400';
-            if (isFolder && expandedFolderIds.has(node.id)) {
-                iconClass = 'fas fa-folder-open text-yellow-500';
-            }
-
-            // 들여쓰기 계산 (기본 0.5rem + depth * 0.8rem)
+            if (isFolder && expandedFolderIds.has(node.id)) iconClass = 'fas fa-folder-open text-yellow-500';
             const paddingLeft = 0.5 + (depth * 0.8);
 
             wrapper.innerHTML = `
                 <div class="tree-content group ${node.id === activeFileId ? 'active' : ''}" 
                      style="padding-left: ${paddingLeft}rem"
                      onclick="handleNodeClick(this, '${node.id}', '${node.type}', '${node.name.replace(/'/g, "\\'")}', '${parentName}')">
-                    
-                    <span class="tree-arrow ${isFolder ? '' : 'invisible'}">
-                        <i class="fas fa-chevron-right"></i>
-                    </span>
-                    
+                    <span class="tree-arrow ${isFolder ? '' : 'invisible'}"><i class="fas fa-chevron-right"></i></span>
                     <i class="${iconClass} mr-2 w-4 text-center opacity-80 node-icon"></i>
                     <span class="truncate text-sm select-none flex-1">${node.name}</span>
-                    
                     <div class="flex items-center space-x-1 opacity-0 group-hover:opacity-100 ml-2" onclick="event.stopPropagation()">
-                        ${!isFolder ? `
-                        <button onclick="downloadFile(event, '${node.id}')" class="text-notion-muted hover:text-green-400 p-1" title="다운로드">
-                            <i class="fas fa-download text-xs"></i>
-                        </button>` : ''}
-                        <button onclick="deleteNode(event, '${node.id}')" class="text-notion-muted hover:text-red-400 p-1" title="삭제">
-                            <i class="fas fa-trash-alt text-xs"></i>
-                        </button>
+                        ${!isFolder ? `<button onclick="downloadFile(event, '${node.id}')" class="text-notion-muted hover:text-green-400 p-1"><i class="fas fa-download text-xs"></i></button>` : ''}
+                        <button onclick="deleteNode(event, '${node.id}')" class="text-notion-muted hover:text-red-400 p-1"><i class="fas fa-trash-alt text-xs"></i></button>
                     </div>
                 </div>
                 ${isFolder ? `<div class="tree-children" id="children-${node.id}"></div>` : ''}
             `;
-            
             return wrapper;
         }
 
-        // 3-4. 클릭 핸들러 (폴더 토글 / 파일 열기)
         async function handleNodeClick(el, id, type, name, parentName) {
             if (type === 'folder') {
                 const arrow = el.querySelector('.tree-arrow');
                 const icon = el.querySelector('.node-icon');
                 const childrenContainer = el.parentElement.querySelector('.tree-children');
-                
                 const isExpanded = expandedFolderIds.has(id);
-                
                 if (isExpanded) {
-                    // 접기
                     expandedFolderIds.delete(id);
                     arrow.classList.remove('expanded');
                     childrenContainer.classList.remove('show');
                     icon.className = 'fas fa-folder text-yellow-500 mr-2 w-4 text-center opacity-80 node-icon';
-                    childrenContainer.innerHTML = ''; // 내용 비우기 (메모리 관리)
+                    childrenContainer.innerHTML = '';
                 } else {
-                    // 펼치기
                     expandedFolderIds.add(id);
                     arrow.classList.add('expanded');
                     childrenContainer.classList.add('show');
                     icon.className = 'fas fa-folder-open text-yellow-500 mr-2 w-4 text-center opacity-80 node-icon';
-                    
-                    // 자식 로드 (비어있을 때만)
                     if (childrenContainer.children.length === 0) {
-                        // 현재 paddingLeft를 역산하여 depth 추정
                         const currentPadding = parseFloat(el.style.paddingLeft);
                         const currentDepth = Math.round((currentPadding - 0.5) / 0.8);
-                        
                         childrenContainer.innerHTML = '<div class="text-xs text-notion-muted py-1 pl-8">로딩 중...</div>';
                         await loadFolderChildren(id, childrenContainer, currentDepth + 1, name);
                     }
                 }
-                
-                // 상태 저장
                 localStorage.setItem('viewer_expanded_folders', JSON.stringify([...expandedFolderIds]));
-
             } else {
-                // 파일 클릭
-                // UI 활성화 처리
                 document.querySelectorAll('.tree-content').forEach(c => c.classList.remove('active'));
                 el.classList.add('active');
                 activeFileId = id;
-
-                // 탭 열기 (상위 폴더 이름 전달)
                 openDoc({ id, name }, 0, parentName);
             }
         }
 
-        // 3-5. 하위 폴더 데이터 로드
         async function loadFolderChildren(parentId, container, depth, parentName) {
             try {
                 const res = await fetch(`/api/docs/nodes?parent_id=${parentId}`);
                 if (!res.ok) throw new Error("Fetch failed");
                 const nodes = await res.json();
-                
-                container.innerHTML = ''; // 로딩 메시지 제거
-                
+                container.innerHTML = '';
                 if (nodes.length === 0) {
                     const paddingLeft = 0.5 + (depth * 0.8);
                     container.innerHTML = `<div class="text-xs text-notion-muted py-1 select-none opacity-50" style="padding-left:${paddingLeft}rem">(비어 있음)</div>`;
                     return;
                 }
-                
                 await renderTreeNodes(nodes, container, depth, parentName);
-                
             } catch (err) {
-                console.error(err);
                 container.innerHTML = `<div class="text-xs text-red-400 py-1 pl-4">Error</div>`;
             }
         }
@@ -556,74 +517,41 @@
         // ==========================================
         // 4. Tab & Document Logic
         // ==========================================
-
         async function openDoc(node, initialIndex = 0, parentName = 'root') {
-            // 이미 열려있는 탭 확인
             const existingTab = openedTabs.find(tab => tab.id === node.id);
-            if (existingTab) {
-                switchTab(node.id);
-                return;
-            }
-
+            if (existingTab) { switchTab(node.id); return; }
             try {
                 const res = await fetch(`/api/docs/content/${node.id}`); 
                 if (!res.ok) throw new Error("Load failed");
                 const data = await res.json();
-                
                 const processed = preprocessMath(data.content);
                 const parsedSlides = parseSlides(data.content, processed.mathMap);
-
-                // 탭 이름 설정 (root가 아니면 폴더명/파일명)
                 let displayName = node.name;
-                if (parentName && parentName !== 'root') {
-                    displayName = `${parentName}/${node.name}`;
-                }
-
+                if (parentName && parentName !== 'root') displayName = `${parentName}/${node.name}`;
                 const newTab = {
-                    id: node.id,
-                    name: displayName,
-                    content: data.content,
+                    id: node.id, name: displayName, content: data.content,
                     processedContent: marked.parse(processed.content),
-                    mathMap: processed.mathMap,
-                    slides: parsedSlides,
-                    currentIndex: initialIndex,
-                    zoom: 100
+                    mathMap: processed.mathMap, slides: parsedSlides,
+                    currentIndex: initialIndex, zoom: 100
                 };
-
                 openedTabs.push(newTab);
                 renderTabBar();
                 switchTab(newTab.id);
                 saveSession();
-                
                 if (window.innerWidth < 768) toggleSidebar(false);
-
-            } catch (err) { console.error(err); alert("문서를 불러올 수 없습니다."); }
+            } catch (err) { alert("문서를 불러올 수 없습니다."); }
         }
 
         function renderTabBar() {
             tabBar.innerHTML = '';
-            if (openedTabs.length === 0) {
-                tabBar.classList.add('hidden');
-                return;
-            }
+            if (openedTabs.length === 0) { tabBar.classList.add('hidden'); return; }
             tabBar.classList.remove('hidden');
-
             openedTabs.forEach(tab => {
                 const tabEl = document.createElement('div');
                 tabEl.className = `tab-item ${tab.id === activeTabId ? 'active' : ''}`;
-                tabEl.innerHTML = `
-                    <span class="truncate mr-2" title="${tab.name}">${tab.name}</span>
-                    <button class="tab-close"><i class="fas fa-times"></i></button>
-                `;
-                
+                tabEl.innerHTML = `<span class="truncate mr-2" title="${tab.name}">${tab.name}</span><button class="tab-close"><i class="fas fa-times"></i></button>`;
                 tabEl.onclick = () => switchTab(tab.id);
-                
-                const closeBtn = tabEl.querySelector('.tab-close');
-                closeBtn.onclick = (e) => {
-                    e.stopPropagation();
-                    closeTab(tab.id);
-                };
-
+                tabEl.querySelector('.tab-close').onclick = (e) => { e.stopPropagation(); closeTab(tab.id); };
                 tabBar.appendChild(tabEl);
             });
         }
@@ -631,9 +559,7 @@
         function closeTab(id) {
             const index = openedTabs.findIndex(t => t.id === id);
             if (index === -1) return;
-
             openedTabs.splice(index, 1);
-            
             if (id === activeTabId) {
                 if (openedTabs.length > 0) {
                     const newIndex = index > 0 ? index - 1 : 0;
@@ -652,65 +578,41 @@
         }
 
         function switchTab(id) {
-            activeTabId = id;
-            activeFileId = id; // 트리뷰 하이라이트 동기화
-            
-            // 트리뷰 UI 업데이트 (선택된 파일 강조)
+            activeTabId = id; activeFileId = id;
             document.querySelectorAll('.tree-content').forEach(c => c.classList.remove('active'));
             const treeItem = document.querySelector(`.tree-content[onclick*="${id}"]`);
             if(treeItem) treeItem.classList.add('active');
-
             saveSession();
-            
             const tab = openedTabs.find(t => t.id === id);
             if (!tab) return;
-
             renderTabBar();
             emptyView.classList.add('hidden');
             toolbar.style.display = 'flex';
-
             markdownBody.innerHTML = tab.processedContent;
             postprocessMath(markdownBody, tab.mathMap);
-
             setViewMode('presentation');
             renderCurrentSlide();
             applyFontSize();
         }
 
-        function getActiveTab() {
-            return openedTabs.find(t => t.id === activeTabId);
-        }
+        function getActiveTab() { return openedTabs.find(t => t.id === activeTabId); }
 
         async function restoreSession() {
             const savedTabsJSON = localStorage.getItem('viewer_tabs');
             const savedActiveId = localStorage.getItem('viewer_active_id');
-        
             if (savedTabsJSON) {
                 try {
                     const savedTabs = JSON.parse(savedTabsJSON);
                     for (const tabMeta of savedTabs) {
-                        // 세션 복구 시 부모 이름은 정확히 알기 어려우므로 기본값 혹은 저장된 이름 사용
-                        // 여기서는 일단 파일명만 넘기거나, 탭 이름을 그대로 활용할 수도 있음
-                        // 편의상 parentName은 'root'로 넘겨도 openDoc 내부 로직에 의해 탭 이름은 tabMeta.name이 덮어쓰지 않음 (openDoc 수정 필요)
-                        // 하지만 openDoc은 노드 정보를 기반으로 이름을 새로 생성함.
-                        // 정확한 복구를 위해 tabMeta.name을 유지하고 싶다면 openDoc 로직을 조금 수정해야 함.
-                        // 일단은 'root'로 호출하여 파일명만 띄우거나, 파일이 실제 트리에 있다면 유저가 클릭시 업데이트 됨.
                         await openDoc({ id: tabMeta.id, name: tabMeta.name.split('/').pop() }, tabMeta.currentIndex || 0, 'root');
                     }
                     if (savedActiveId) switchTab(savedActiveId);
-                } catch (e) {
-                    console.error("세션 복구 실패:", e);
-                    localStorage.removeItem('viewer_tabs');
-                }
+                } catch (e) { localStorage.removeItem('viewer_tabs'); }
             }
         }
 
         function saveSession() {
-            const sessionData = openedTabs.map(t => ({ 
-                id: t.id, 
-                name: t.name, 
-                currentIndex: t.currentIndex || 0 
-            }));
+            const sessionData = openedTabs.map(t => ({ id: t.id, name: t.name, currentIndex: t.currentIndex || 0 }));
             localStorage.setItem('viewer_tabs', JSON.stringify(sessionData));
             localStorage.setItem('viewer_active_id', activeTabId || '');
         }
@@ -718,31 +620,44 @@
         // ==========================================
         // 5. Viewer & Presentation Logic
         // ==========================================
-
-        viewModeBtn.addEventListener('click', () => {
-            if (viewMode === 'scroll') setViewMode('presentation');
-            else setViewMode('scroll');
-        });
+        viewModeBtn.addEventListener('click', () => { if (viewMode === 'scroll') setViewMode('presentation'); else setViewMode('scroll'); });
 
         function setViewMode(mode) {
             viewMode = mode;
             const zoomControls = document.getElementById('zoomControls');
             const copyImageBtn = document.getElementById('copyImageBtn');
-
             if (mode === 'presentation') {
                 viewModeBtn.innerHTML = '<i class="fas fa-scroll"></i> <span>스크롤 모드</span>';
-                scrollView.classList.add('hidden');
-                presentationView.classList.add('active');
+                scrollView.classList.add('hidden'); presentationView.classList.add('active');
                 zoomControls.classList.remove('hidden'); zoomControls.classList.add('flex');
                 copyImageBtn.classList.remove('hidden'); copyImageBtn.classList.add('flex');      
                 if (activeTabId) { renderCurrentSlide(); applyFontSize(); }
             } else {
                 viewModeBtn.innerHTML = '<i class="fas fa-desktop"></i> <span>프레젠테이션 모드</span>';
-                presentationView.classList.remove('active');
-                scrollView.classList.remove('hidden');
+                presentationView.classList.remove('active'); scrollView.classList.remove('hidden');
                 zoomControls.classList.remove('flex'); zoomControls.classList.add('hidden');
                 copyImageBtn.classList.remove('flex'); copyImageBtn.classList.add('hidden');    
             }
+        }
+
+        // applyNotionMathLogic (복사된 로직)
+        function applyNotionMathLogic(html) {
+            const protectedMap = {}; let protectedIndex = 0;
+            html = html.replace(/(\$\$[\s\S]+?\$\$|(?<!\\)\$[^$]+\$|<[^>]+>)/g, (match) => {
+                const token = `__PROTECTED_${protectedIndex++}__`; protectedMap[token] = match; return token;
+            });
+            html = html.replace(/\bO\s*\(([^)<>]+)\)/g, (match, inner) => `$O(${inner})$`);
+            html = html.replace(/\b(sum|prod|lim|int)_(\{([^\}]+)\}|[a-zA-Z0-9]+)(\^(\{([^\}]+)\}|[a-zA-Z0-9]+))?/g, (match) => `$\\${match.replace(/ /g, '')}$`);
+            html = html.replace(/\b(log|ln|sin|cos|tan|exp)(_([a-zA-Z0-9]+|\{[^}]+\}))?\s+([a-zA-Z0-9\(\)]+)/g, (match, f, _, b, a) => {
+                const bp = b ? `_{${b.replace(/[{}]/g, '')}}` : ''; return `$\\${f}${bp}\\ ${a}$`;
+            });
+            html = html.replace(/(\([^\)]+\)|[a-zA-Z0-9]+)\^(\{([^\}]+)\}|\[[^\]]+\]|\([^\)]+\)|[a-zA-Z0-9\.]+)/g, (match, b, e) => {
+                let ce = e; if (ce.startsWith('{') && ce.endsWith('}')) ce = ce.slice(1, -1); return `$${b}^{${ce}}$`;
+            });
+            html = html.replace(/\b([a-zA-Z])_([a-zA-Z0-9]+)\b/g, (match, b, s) => `$${b}_{${s}}$`);
+            html = html.replace(/(?<!\$|\w)(\b[a-zA-Z][a-zA-Z0-9\(\)]*\s*(=|≈|≤|≥|<|>)\s*[a-zA-Z0-9_\^\(\)\+\-\*\/ \.]+(?!\$))/g, (match) => `$${match}$`);
+            Object.keys(protectedMap).forEach(token => { html = html.replace(token, protectedMap[token]); });
+            return html;
         }
 
         function parseSlides(content, mathMap) {
@@ -750,69 +665,35 @@
             const html = marked.parse(processed.content);
             const tempDiv = document.createElement('div');
             tempDiv.innerHTML = html;
-
-            const slides = [];
-            let currentSlide = null;
-
+            const slides = []; let currentSlide = null;
             Array.from(tempDiv.children).forEach(child => {
                 if (child.tagName === 'H2' && child.innerText.toLowerCase().includes('slide')) {
                     if (currentSlide) slides.push(currentSlide);
                     currentSlide = { image: null, htmlParts: [] };
-                    currentSlide.htmlParts.push(child.outerHTML);
-                    return;
+                    currentSlide.htmlParts.push(child.outerHTML); return;
                 }
                 if (!currentSlide) currentSlide = { image: null, htmlParts: [] };
-                
                 const img = child.querySelector('img') || (child.tagName === 'IMG' ? child : null);
                 if (img) {
-                    if (!currentSlide.image) currentSlide.image = img.src;
-                    else currentSlide.htmlParts.push(child.outerHTML);
-                } else if (child.tagName !== 'HR') {
-                    currentSlide.htmlParts.push(child.outerHTML);
-                }
+                    if (!currentSlide.image) currentSlide.image = img.src; else currentSlide.htmlParts.push(child.outerHTML);
+                } else if (child.tagName !== 'HR') currentSlide.htmlParts.push(child.outerHTML);
             });
             if (currentSlide) slides.push(currentSlide);
             return slides;
         }
 
         function renderCurrentSlide() {
-            const tab = getActiveTab();
-            if (!tab || tab.slides.length === 0) return;
-            
+            const tab = getActiveTab(); if (!tab || tab.slides.length === 0) return;
             const slide = tab.slides[tab.currentIndex];
-            
-            // 1. 이미지 처리
             if (slide.image) {
-                slideImage.src = slide.image; 
-                slideImage.classList.remove('hidden'); 
-                noImageText.classList.add('hidden');
+                slideImage.src = slide.image; slideImage.classList.remove('hidden'); noImageText.classList.add('hidden');
             } else {
-                slideImage.classList.add('hidden'); 
-                noImageText.classList.remove('hidden');
+                slideImage.classList.add('hidden'); noImageText.classList.remove('hidden');
             }
-        
-            // 2. 텍스트 처리
             let rawHtml = slide.htmlParts.join('');
-        
-            // (기존) 아래첨자 처리: x_L -> $x_{L}$
-            rawHtml = rawHtml.replace(/\b([a-zA-Z])_([a-zA-Z0-9]+)\b/g, '$$$1_{$2}$$');
-        
-            // [추가] 위첨자(제곱) 처리: n^2, n^[n/2], n^~~ 등
-            // 설명: 
-            // 1. ([a-zA-Z0-9]+) : 영문자나 숫자로 된 밑 (예: n, 2, x)
-            // 2. \^             : 실제 ^ 기호
-            // 3. (...)          : 지수 부분. 다음 세 가지 경우를 모두 잡습니다.
-            //    - [a-zA-Z0-9\.~]+  : 일반 문자, 숫자, 점(.), 물결(~) (예: 2, ~~)
-            //    - \[[^\]]+\]       : 대괄호로 묶인 것 (예: [n/2])
-            //    - \([^)]+\)        : 소괄호로 묶인 것 (예: (n-1))
-            rawHtml = rawHtml.replace(/([a-zA-Z0-9]+)\^([a-zA-Z0-9\.~]+|\[[^\]]+\]|\([^)]+\)|\{[^}]+\})/g, '$$$1^{$2}$$');
-        
+            rawHtml = applyNotionMathLogic(rawHtml);
             slideText.innerHTML = rawHtml;
-            
-            // 3. 수식 렌더링
             postprocessMath(slideText, tab.mathMap);
-        
-            // 4. 네비게이션 상태 업데이트
             pageIndicator.textContent = `${tab.currentIndex + 1} / ${tab.slides.length}`;
             prevSlideBtn.disabled = tab.currentIndex === 0;
             nextSlideBtn.disabled = tab.currentIndex === tab.slides.length - 1;
@@ -820,77 +701,60 @@
         }
         
         prevSlideBtn.addEventListener('click', () => { 
-            const tab = getActiveTab();
-            if (tab && tab.currentIndex > 0) { tab.currentIndex--; renderCurrentSlide(); saveSession(); } 
+            const tab = getActiveTab(); if (tab && tab.currentIndex > 0) { tab.currentIndex--; renderCurrentSlide(); saveSession(); } 
         });
-
         nextSlideBtn.addEventListener('click', () => { 
-            const tab = getActiveTab();
-            if (tab && tab.currentIndex < tab.slides.length - 1) { tab.currentIndex++; renderCurrentSlide(); saveSession(); } 
+            const tab = getActiveTab(); if (tab && tab.currentIndex < tab.slides.length - 1) { tab.currentIndex++; renderCurrentSlide(); saveSession(); } 
         });
-
         document.addEventListener('keydown', (e) => {
+            // 1. 입력창에서는 단축키 작동 중지
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+        
+            if (e.code === 'KeyF' && !e.ctrlKey && !e.altKey && !e.metaKey) {
+                e.preventDefault(); // 브라우저 기본 동작 방지
+                toggleFullScreen();
+                return;
+            }
+    
             if (viewMode !== 'presentation') return;
-            if (e.key === 'ArrowLeft') prevSlideBtn.click();
-            if (e.key === 'ArrowRight') nextSlideBtn.click();
+            if (e.code === 'ArrowLeft') prevSlideBtn.click();
+            if (e.code === 'ArrowRight') nextSlideBtn.click();
         });
 
         function adjustFontSize(delta) {
-            const tab = getActiveTab();
-            if (!tab) return;
-            tab.zoom += delta;
-            if (tab.zoom < 50) tab.zoom = 50;
-            if (tab.zoom > 200) tab.zoom = 200;
+            const tab = getActiveTab(); if (!tab) return;
+            tab.zoom += delta; if (tab.zoom < 50) tab.zoom = 50; if (tab.zoom > 200) tab.zoom = 200;
             applyFontSize();
         }
-
         function applyFontSize() {
-            const tab = getActiveTab();
-            if (!tab) return;
-            slideText.style.fontSize = `${tab.zoom}%`;
-            zoomDisplay.textContent = `${tab.zoom}%`;
+            const tab = getActiveTab(); if (!tab) return;
+            slideText.style.fontSize = `${tab.zoom}%`; zoomDisplay.textContent = `${tab.zoom}%`;
         }
 
         // ==========================================
         // 6. Fullscreen & UI Utils
         // ==========================================
-
         function toggleFullScreen() {
             const isFullscreen = body.classList.contains('fullscreen-mode');
             const elem = document.documentElement;
-            
             if (!isFullscreen) {
                 body.classList.add('fullscreen-mode');
-                if (elem.requestFullscreen) elem.requestFullscreen().catch(e=>console.log(e));
-                else if (elem.webkitRequestFullscreen) elem.webkitRequestFullscreen();
+                if (elem.requestFullscreen) elem.requestFullscreen().catch(e=>{}); else if (elem.webkitRequestFullscreen) elem.webkitRequestFullscreen();
                 document.getElementById('fullscreenBtn').innerHTML = '<i class="fas fa-compress"></i>';
             } else {
                 body.classList.remove('fullscreen-mode');
-                if (document.exitFullscreen) document.exitFullscreen().catch(e=>console.log(e));
-                else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+                if (document.exitFullscreen) document.exitFullscreen().catch(e=>{}); else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
                 document.getElementById('fullscreenBtn').innerHTML = '<i class="fas fa-expand"></i>';
             }
         }
-
         document.addEventListener('fullscreenchange', () => {
             if (!document.fullscreenElement) {
-                body.classList.remove('fullscreen-mode');
-                document.getElementById('fullscreenBtn').innerHTML = '<i class="fas fa-expand"></i>';
+                body.classList.remove('fullscreen-mode'); document.getElementById('fullscreenBtn').innerHTML = '<i class="fas fa-expand"></i>';
             }
         });
-
-        // Sidebar Toggle
-        hideSidebarBtn.addEventListener('click', () => {
-            body.classList.add('sidebar-closed');
-            localStorage.setItem('sidebarClosed', 'true');
-        });
+        hideSidebarBtn.addEventListener('click', () => { body.classList.add('sidebar-closed'); localStorage.setItem('sidebarClosed', 'true'); });
         openSidebarBtn.addEventListener('click', () => {
-            if (body.classList.contains('sidebar-closed')) {
-                body.classList.remove('sidebar-closed');
-                localStorage.setItem('sidebarClosed', 'false');
-            } else {
-                toggleSidebar(true);
-            }
+            if (body.classList.contains('sidebar-closed')) { body.classList.remove('sidebar-closed'); localStorage.setItem('sidebarClosed', 'false'); } else toggleSidebar(true);
         });
         function toggleSidebar(show) {
             if (show) { sidebar.classList.remove('-translate-x-full'); sidebarOverlay.classList.remove('hidden'); setTimeout(()=>sidebarOverlay.classList.remove('opacity-0'),10); }
@@ -899,7 +763,6 @@
         closeSidebarBtn.addEventListener('click', () => toggleSidebar(false));
         sidebarOverlay.addEventListener('click', () => toggleSidebar(false));
 
-        // Drag & Drop
         let dragCounter = 0;
         body.addEventListener('dragenter', (e) => { e.preventDefault(); dragCounter++; dragOverlay.classList.add('active'); });
         body.addEventListener('dragleave', (e) => { e.preventDefault(); dragCounter--; if (dragCounter === 0) dragOverlay.classList.remove('active'); });
@@ -910,69 +773,32 @@
         });
 
         // ==========================================
-        // 7. CRUD Operations (Updated for Tree)
+        // 7. CRUD Operations
         // ==========================================
-
         async function handleFileUpload(file) {
-            // 트리 구조에서는 현재 선택된 폴더가 모호할 수 있으므로 'root'에 업로드
-            const parentId = 'root'; 
-            const formData = new FormData(); 
-            formData.append('file', file); 
-            formData.append('parent_id', parentId);
-            
-            const btn = document.getElementById('uploadBtn'); 
-            const org = btn.innerHTML; 
-            btn.innerHTML='<i class="fas fa-spinner fa-spin"></i>'; 
-            btn.disabled=true;
-            
-            try { 
-                const res = await fetch('/api/docs/upload', {method:'POST',body:formData}); 
-                if(!res.ok) throw new Error; 
-                loadTreeRoot(); // 트리 새로고침
-            }
-            catch(e){ alert('업로드 실패'); } 
-            finally{ btn.innerHTML=org; btn.disabled=false; }
+            const formData = new FormData(); formData.append('file', file); formData.append('parent_id', 'root');
+            const btn = document.getElementById('uploadBtn'); const org = btn.innerHTML; btn.innerHTML='<i class="fas fa-spinner fa-spin"></i>'; btn.disabled=true;
+            try { const res = await fetch('/api/docs/upload', {method:'POST',body:formData}); if(!res.ok) throw new Error; loadTreeRoot(); }
+            catch(e){ alert('업로드 실패'); } finally{ btn.innerHTML=org; btn.disabled=false; }
         }
-
         async function createFolder() {
-            const name = prompt('새 폴더 이름 (Root에 생성):'); 
-            if(!name) return;
-            const formData = new FormData(); 
-            formData.append('name', name); 
-            formData.append('parent_id', 'root');
-            await fetch('/api/docs/folder', {method:'POST',body:formData}); 
-            loadTreeRoot();
+            const name = prompt('새 폴더 이름 (Root에 생성):'); if(!name) return;
+            const formData = new FormData(); formData.append('name', name); formData.append('parent_id', 'root');
+            await fetch('/api/docs/folder', {method:'POST',body:formData}); loadTreeRoot();
         }
-
-        function downloadFile(e, id) {
-            e.stopPropagation();
-            window.location.href = `/api/docs/download/${id}`;
-        }
-
+        function downloadFile(e, id) { e.stopPropagation(); window.location.href = `/api/docs/download/${id}`; }
         async function deleteNode(e, id) {
-            e.stopPropagation();
-            if (!confirm('삭제하시겠습니까?')) return;
-            try {
-                await fetch(`/api/docs/${id}`, { method: 'DELETE' });
-                closeTab(id);
-                loadTreeRoot(); // 전체 트리 새로고침 (간단한 동기화)
-            } catch (err) { alert('삭제 실패'); }
+            e.stopPropagation(); if (!confirm('삭제하시겠습니까?')) return;
+            try { await fetch(`/api/docs/${id}`, { method: 'DELETE' }); closeTab(id); loadTreeRoot(); } catch (err) { alert('삭제 실패'); }
         }
-
         async function copySlideImage() {
-            const img = document.getElementById('slideImage');
-            if (!img || img.classList.contains('hidden')) return alert('이미지 없음');
-            try {
-                const blob = await (await fetch(img.src)).blob();
-                await navigator.clipboard.write([new ClipboardItem({ [blob.type]: blob })]);
-                alert('이미지 복사 완료');
-            } catch(e) { alert('복사 실패'); }
+            const img = document.getElementById('slideImage'); if (!img || img.classList.contains('hidden')) return alert('이미지 없음');
+            try { const blob = await (await fetch(img.src)).blob(); await navigator.clipboard.write([new ClipboardItem({ [blob.type]: blob })]); alert('이미지 복사 완료'); } catch(e) { alert('복사 실패'); }
         }
 
         // ==========================================
         // 8. MathJax / History Modal
         // ==========================================
-
         function preprocessMath(content) {
             const mathMap = [];
             content = content.replace(/\$\$([\s\S]+?)\$\$/g, (m, c) => { const id = `MB_${mathMap.length}`; mathMap.push({id, c, t:'b'}); return id; });
@@ -981,7 +807,6 @@
             content = content.replace(/\\\(([\s\S]+?)\\\)/g, (m, c) => { const id = `MI_${mathMap.length}`; mathMap.push({id, c, t:'i'}); return id; });
             return { content, mathMap };
         }
-
         function postprocessMath(element, mathMap) {
             let html = element.innerHTML;
             mathMap.forEach(i => { html = html.replace(i.id, i.t==='b' ? `$$${i.c}$$` : `$${i.c}$`); });
@@ -990,35 +815,22 @@
             hljs.highlightAll();
         }
 
-        // History Modal
         const historyModal = document.getElementById('historyModal');
         const historyList = document.getElementById('historyList');
-
         function openHistoryModal() {
             historyModal.classList.remove('hidden');
-            setTimeout(() => {
-                historyModal.classList.remove('opacity-0');
-                document.getElementById('historyModalContent').classList.remove('scale-95');
-            }, 10);
+            setTimeout(() => { historyModal.classList.remove('opacity-0'); document.getElementById('historyModalContent').classList.remove('scale-95'); }, 10);
             fetchHistory();
         }
-
         function closeHistoryModal() {
-            historyModal.classList.add('opacity-0');
-            document.getElementById('historyModalContent').classList.add('scale-95');
+            historyModal.classList.add('opacity-0'); document.getElementById('historyModalContent').classList.add('scale-95');
             setTimeout(() => { historyModal.classList.add('hidden'); }, 200);
         }
-
         historyModal.addEventListener('click', (e) => { if (e.target === historyModal) closeHistoryModal(); });
 
         async function fetchHistory() {
             historyList.innerHTML = '<div class="text-center text-notion-muted py-8"><i class="fas fa-spinner fa-spin text-2xl mb-2"></i><p>로딩 중...</p></div>';
-            try {
-                const res = await fetch('/api/docs/history'); 
-                if (!res.ok) throw new Error;
-                const jobs = await res.json();
-                renderHistoryList(jobs);
-            } catch (err) { historyList.innerHTML = '<div class="text-center text-red-400 py-8"><p>불러오기 실패</p></div>'; }
+            try { const res = await fetch('/api/docs/history'); if (!res.ok) throw new Error; const jobs = await res.json(); renderHistoryList(jobs); } catch (err) { historyList.innerHTML = '<div class="text-center text-red-400 py-8"><p>불러오기 실패</p></div>'; }
         }
 
         function renderHistoryList(jobs) {
@@ -1026,23 +838,19 @@
             if (jobs.length === 0) { historyList.innerHTML = '<div class="text-center text-notion-muted py-10"><p>작업 없음</p></div>'; return; }
             jobs.forEach(job => {
                 const item = document.createElement('div');
+                // bg-notion-sidebar, text-notion-text 적용
                 item.className = 'flex items-center justify-between p-3 mb-1 bg-notion-sidebar border border-notion-border rounded-lg hover:border-purple-500/50 transition group';
                 item.innerHTML = `
-                    <div class="flex-1 min-w-0 mr-4"><div class="text-sm font-medium text-white truncate">${job.filename}</div></div>
+                    <div class="flex-1 min-w-0 mr-4"><div class="text-sm font-medium text-notion-text truncate">${job.filename}</div></div>
                     <button onclick="importJob('${job.id}')" class="bg-purple-600 hover:bg-purple-500 text-white text-xs px-3 py-1.5 rounded shadow">가져오기</button>
                 `;
                 historyList.appendChild(item);
             });
         }
-
         async function importJob(jobId) {
             if (!confirm('가져오시겠습니까?')) return;
             const formData = new FormData(); formData.append('parent_id', 'root');
-            try {
-                const res = await fetch(`/api/docs/import/${jobId}`, { method: 'POST', body: formData });
-                if (!res.ok) throw new Error;
-                closeHistoryModal(); loadTreeRoot();
-            } catch (err) { alert('실패'); }
+            try { const res = await fetch(`/api/docs/import/${jobId}`, { method: 'POST', body: formData }); if (!res.ok) throw new Error; closeHistoryModal(); loadTreeRoot(); } catch (err) { alert('실패'); }
         }
     </script>
 </body>

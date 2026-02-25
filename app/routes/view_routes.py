@@ -1,13 +1,12 @@
-# app/routes/views.py
-
-from fastapi import APIRouter, Request, Response
-from fastapi.responses import RedirectResponse
+# app/routes/view_routes.py
+from fastapi import APIRouter, Request
 from fastapi.templating import Jinja2Templates
+from fastapi.responses import HTMLResponse, RedirectResponse
 from app.services.auth_manager import AuthManager
 import os
 
 router = APIRouter()
-templates = Jinja2Templates(directory=os.path.join(os.path.dirname(__file__), "..", "templates"))
+templates = Jinja2Templates(directory="app/templates")
 
 @router.get("/")
 async def index(request: Request):
@@ -48,7 +47,6 @@ async def settings_page(request: Request):
     if not user:
         return RedirectResponse(url="/login", status_code=302)
     
-    # 현재 설정 불러오기
     user_settings = AuthManager.get_user_settings(user)
     
     return templates.TemplateResponse("settings.html", {
@@ -56,3 +54,17 @@ async def settings_page(request: Request):
         "username": user,
         "settings": user_settings
     })
+
+# 기존 docs.py의 뷰 라우트
+@router.get("/viewer")
+async def viewer_page(request: Request):
+    session_id = request.cookies.get("session_id")
+    user = AuthManager.get_user_by_session(session_id)
+    if not user:
+        return RedirectResponse(url="/login", status_code=302)
+    
+    return templates.TemplateResponse("viewer.html", {"request": request, "username": user})
+
+@router.get("/guide/openai", response_class=HTMLResponse)
+async def get_openai_guide(request: Request):
+    return templates.TemplateResponse("guide_openai.html", {"request": request})

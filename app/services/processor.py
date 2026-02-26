@@ -111,14 +111,17 @@ def describe_image(image_path: str, model_config: dict):
     max_retries = 3
     for attempt in range(max_retries):
         try:
-            # 타임아웃을 180초로 넉넉하게 설정
             resp = requests.post(url, headers=headers, json=payload, timeout=180)
             
-            # 1. 성공 (200 OK)
             if resp.status_code == 200:
                 result = resp.json()
-                content = result["choices"][0]["message"]["content"]
+                content = result["choices"][0]["message"].get("content", "")
                 
+                if not content or not content.strip():
+                    print(f"[Empty Response] {filename} returned empty content. Retrying... ({attempt+1}/{max_retries})")
+                    time.sleep(2)
+                    continue
+
                 usage_info = {"prompt": 0, "cached": 0, "completion": 0}
                 try:
                     usage = result.get('usage', {})
@@ -129,20 +132,17 @@ def describe_image(image_path: str, model_config: dict):
                     pass
                 return content, usage_info
 
-            # 2. 속도 제한 (429 Too Many Requests) - API Rate Limit
             elif resp.status_code == 429:
-                wait_time = (attempt + 1) * 5  # 5초, 10초, 15초 대기
+                wait_time = (attempt + 1) * 5
                 print(f"[Rate Limit] 429 Error on {filename}. Waiting {wait_time}s... (Attempt {attempt+1}/{max_retries})")
                 time.sleep(wait_time)
-                continue # 다음 루프로 재시도
+                continue
             
-            # 3. 그 외 서버 에러 (500 등)
             else:
                 print(f"[API Error] {resp.status_code}: {resp.text}")
                 if resp.status_code >= 500:
                     time.sleep(3)
                     continue
-                # 400번대 에러(Bad Request 등)는 재시도해도 소용없으므로 바로 에러 처리
                 raise RuntimeError(f"OpenAI API Error: {resp.status_code} - {resp.text}")
 
         except requests.exceptions.Timeout:
@@ -156,9 +156,7 @@ def describe_image(image_path: str, model_config: dict):
                 raise e
             time.sleep(2)
 
-    # 반복문이 끝날 때까지 성공 못하면 에러 처리
     raise RuntimeError(f"Failed to process {filename} after {max_retries} attempts.")
-
 
 def convert_ppt_to_pdf(ppt_path: str, output_dir: str):
     subprocess.run(
@@ -204,12 +202,12 @@ def _process_job_internal(job_id: str, file_path: str, model_config: dict):
         if ext == ".pdf":
             raw_images = convert_from_path(file_path, fmt="png", dpi=150)
             for i, img in enumerate(raw_images):
-                p = os.path.join(work_dir, f"page_{i:03d}.png"); img.save(p); images.append(p)
+                p = os.path.join(work_dir, f"page_{i+1:03d}.png"); img.save(p); images.append(p)
         elif ext in [".ppt", ".pptx"]:
             pdf_path = convert_ppt_to_pdf(file_path, work_dir)
             raw_images = convert_from_path(pdf_path, fmt="png", dpi=150)
             for i, img in enumerate(raw_images):
-                p = os.path.join(work_dir, f"page_{i:03d}.png"); img.save(p); images.append(p)
+                p = os.path.join(work_dir, f"page_{i+1:03d}.png"); img.save(p); images.append(p)
 
         result_base = os.path.join(settings.RESULT_DIR, job_id)
         result_images_dir = os.path.join(result_base, "images")
@@ -297,7 +295,7 @@ def _process_job_internal(job_id: str, file_path: str, model_config: dict):
         sorted_indices = sorted(results_map.keys())
         for idx in sorted_indices:
             fname, text = results_map[idx]
-            md_content += f"## Slide {idx-1}\n\n![{fname}](./images/{fname})\n\n{text}\n\n---\n\n"
+            md_content += f"## Slide {idx}\n\n![{fname}](./images/{fname})\n\n{text}\n\n---\n\n"
 
         # 4. 최종 완료 처리
         if model_config['provider'] == 'openai':

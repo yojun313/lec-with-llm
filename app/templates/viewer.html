@@ -2,7 +2,7 @@
 <html lang="ko" class="dark">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Viewer - LecAI</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
@@ -715,6 +715,11 @@
                 toggleFullScreen();
                 return;
             }
+            if (e.code === 'KeyD' && !e.ctrlKey && !e.altKey && !e.metaKey) {
+                e.preventDefault(); 
+                toggleTheme();
+                return;
+            }
     
             if (viewMode !== 'presentation') return;
             if (e.code === 'ArrowLeft') prevSlideBtn.click();
@@ -730,6 +735,44 @@
             const tab = getActiveTab(); if (!tab) return;
             slideText.style.fontSize = `${tab.zoom}%`; zoomDisplay.textContent = `${tab.zoom}%`;
         }
+
+        // ==========================================
+        // 5-1. Touch Swipe Logic (Mobile Presentation)
+        // ==========================================
+        let touchStartX = 0;
+        let touchEndX = 0;
+        
+        // [수정 1] 전체 화면 대신 '이미지 영역'만 선택
+        const swipeTarget = document.querySelector('.split-image-container');
+
+        if (swipeTarget) {
+            swipeTarget.addEventListener('touchstart', (e) => {
+                touchStartX = e.changedTouches[0].screenX;
+            }, { passive: true });
+
+            swipeTarget.addEventListener('touchend', (e) => {
+                touchEndX = e.changedTouches[0].screenX;
+                handleSwipe();
+            }, { passive: true });
+        }
+
+        function handleSwipe() {
+            if (viewMode !== 'presentation') return;
+            
+            // [수정 2] 감도 조절: 50 -> 100 (숫자가 클수록 더 길게 밀어야 넘어감)
+            const SWIPE_THRESHOLD = 100; 
+            
+            if (touchEndX < touchStartX - SWIPE_THRESHOLD) {
+                // 왼쪽으로 길게 스와이프 -> 다음
+                nextSlideBtn.click();
+            }
+            
+            if (touchEndX > touchStartX + SWIPE_THRESHOLD) {
+                // 오른쪽으로 길게 스와이프 -> 이전
+                prevSlideBtn.click();
+            }
+        }
+
 
         // ==========================================
         // 6. Fullscreen & UI Utils

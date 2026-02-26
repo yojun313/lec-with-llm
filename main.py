@@ -3,7 +3,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from app.core.config import settings
-from app.routes import view_routes, auth_routes, job_routes, user_routes, doc_routes, lms_routes
+from app.routes import view_routes, auth_routes, job_routes, user_routes, doc_routes
 import os
 
 app = FastAPI(title="LecAI")
@@ -17,7 +17,6 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # View 라우터 (HTML 페이지) - Root 레벨
 app.include_router(view_routes.router)
-app.include_router(lms_routes.router)
 
 # API 라우터 그룹 - /api 프리픽스 아래로 통합
 app.include_router(auth_routes.router, prefix="/api", tags=["Auth"])

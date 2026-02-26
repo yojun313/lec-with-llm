@@ -1,55 +1,55 @@
-# app/routes/job_routes.py
-from fastapi import APIRouter, UploadFile, File, BackgroundTasks, HTTPException, Depends
-from app.services.job_manager import JobManager
-from app.services.processor import process_file_task
-from app.services.audio_processor import process_audio_task
-from app.core.config import settings
-from app.routes.deps import get_current_user
-import shutil
-import os
+# app/routes/auth_routes.py
+from fastapi import APIRouter, HTTPException, Form
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel
+from app.services.auth_manager import AuthManager
 
 router = APIRouter()
 
-@router.post("/upload")
-async def upload_file(
-    background_tasks: BackgroundTasks, 
-    file: UploadFile = File(...), 
-    user: str = Depends(get_current_user)
+class VerifyRequest(BaseModel):
+    email: str
+    code: str
+
+@router.post("/auth/signup/request")
+async def api_signup_request(
+    username: str = Form(...), 
+    password: str = Form(...), 
+    email: str = Form(...)
 ):
-    # 파일 저장
-    file_path = os.path.join(settings.UPLOAD_DIR, file.filename)
-    with open(file_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
-    
-    # 작업 생성
-    job_id = JobManager.create_job(file.filename, user)
-    
-    # 확장자 확인 및 분기 처리
-    ext = os.path.splitext(file.filename)[1].lower()
-    
-    if ext in ['.mp3', '.wav', '.m4a', '.flac']:
-        background_tasks.add_task(process_audio_task, job_id, file_path)
+    result = AuthManager.request_signup(username, password, email)
+    if result == "success":
+        return {"message": "Verification email sent"}
+    elif result == "username_exists":
+        raise HTTPException(status_code=400, detail="Username already exists")
+    elif result == "email_exists":
+        raise HTTPException(status_code=400, detail="Email already exists")
     else:
-        background_tasks.add_task(process_file_task, job_id, file_path)
+        raise HTTPException(status_code=500, detail="Failed to send email")
     
-    return {"job_id": job_id, "message": "Upload successful"}
+@router.post("/auth/signup/verify")
+async def api_signup_verify(req: VerifyRequest):
+    if AuthManager.verify_and_create_user(req.email, req.code):
+        return {"message": "User created successfully"}
+    raise HTTPException(status_code=400, detail="Invalid verification code")
 
-@router.get("/jobs")
-async def get_my_jobs(user: str = Depends(get_current_user)):
-    return JobManager.get_jobs_by_user(user)
+@router.post("/auth/signup")
+async def api_signup(username: str = Form(...), password: str = Form(...)):
+    if AuthManager.create_user(username, password):
+        return {"message": "User created"}
+    raise HTTPException(status_code=400, detail="User already exists")
 
-@router.get("/status/{job_id}")
-async def get_status(job_id: str, user: str = Depends(get_current_user)):
-    job = JobManager.get_job(job_id)
-    if not job:
-        raise HTTPException(status_code=404)
-    if job.get("owner") != user:
-         raise HTTPException(status_code=403, detail="Not your job")
-    return job
-
-@router.delete("/jobs/{job_id}")
-async def delete_job(job_id: str, user: str = Depends(get_current_user)):
-    success = JobManager.delete_job(job_id, user)
-    if not success:
-        raise HTTPException(status_code=404, detail="Job not found or permission denied")
-    return {"message": "Job deleted"}
+@router.post("/auth/login")
+async def api_login(username: str = Form(...), password: str = Form(...)):
+    session_id = AuthManager.authenticate_user(username, password)
+    if session_id:
+        response = JSONResponse(content={"message": "Login successful"})
+        
+        response.set_cookie(
+            key="session_id", 
+            value=session_id, 
+            httponly=True,
+            max_age=60*60*24*7,  # 7일간 유지
+            expires=60*60*24*7   
+        )
+        return response
+    raise HTTPException(status_code=401, detail="Invalid credentials")

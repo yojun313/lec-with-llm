@@ -311,7 +311,7 @@ def _process_job_internal(job_id: str, file_path: str, model_config: dict):
         sorted_indices = sorted(results_map.keys())
         for idx in sorted_indices:
             fname, text = results_map[idx]
-            md_content += f"## Slide {idx}\n\n![{fname}](./images/{fname})\n\n{text}\n\n---\n\n"
+            md_content += f"## Slide {idx-1}\n\n![{fname}](./images/{fname})\n\n{text}\n\n---\n\n"
 
         # 4. 최종 완료 처리
         if model_config['provider'] == 'openai':

@@ -173,12 +173,28 @@
     <div id="folderModal" class="fixed inset-0 bg-black/70 z-[100] hidden flex items-center justify-center backdrop-blur-sm">
         <div class="bg-card border border-gray-700 w-full max-w-md rounded-xl shadow-2xl overflow-hidden transform transition-all scale-95 opacity-0" id="folderModalContent">
             <div class="p-4 border-b border-gray-700 flex justify-between items-center bg-gray-800">
-                <h3 class="font-bold text-sm text-white"><i class="fas fa-folder-plus mr-2 text-blue-400"></i>Viewer에 추가</h3>
+                <h3 class="font-bold text-sm text-white"><i class="fas fa-file-import mr-2 text-blue-400"></i>문서함으로 보내기</h3>
                 <button onclick="closeFolderModal()" class="text-gray-400 hover:text-white"><i class="fas fa-times"></i></button>
             </div>
             <div class="p-5">
-                <p class="text-xs text-gray-400 mb-3">저장할 대상 폴더를 선택하세요:</p>
-                <div id="folder-list" class="h-64 overflow-y-auto custom-scrollbar border border-gray-700 rounded-lg bg-gray-900/50 mb-4"></div>
+                
+                <div class="flex items-center justify-between mb-4 bg-gray-800/50 p-2 rounded border border-gray-700">
+                    <label class="flex items-center space-x-2 text-xs text-gray-300 cursor-pointer">
+                        <input type="checkbox" id="sendToOtherCheck" class="rounded bg-gray-700 border-gray-600 text-blue-500 focus:ring-0">
+                        <span>다른 계정으로 전송</span>
+                    </label>
+                </div>
+
+                <div id="myFolderSection">
+                    <p class="text-xs text-gray-400 mb-2">저장할 내 폴더 선택:</p>
+                    <div id="folder-list" class="h-48 overflow-y-auto custom-scrollbar border border-gray-700 rounded-lg bg-gray-900/50 mb-4"></div>
+                </div>
+
+                <div id="otherUserSection" class="hidden mb-4">
+                    <p class="text-xs text-gray-400 mb-2">받을 사람의 아이디 (상대방의 Root 폴더에 저장됨):</p>
+                    <input type="text" id="targetUserInput" class="w-full bg-gray-900 border border-gray-700 rounded p-2 text-sm text-white placeholder-gray-600 focus:border-blue-500 focus:outline-none" placeholder="예: user123">
+                </div>
+
                 <input type="hidden" id="selected-job-id">
                 <button id="confirmImportBtn" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-2.5 rounded-lg transition text-sm flex items-center justify-center shadow-lg">
                     <span>저장하기</span>
@@ -518,8 +534,36 @@
         }
 
         // --- 5. Folder Modal Logic ---
+        const sendToOtherCheck = document.getElementById('sendToOtherCheck');
+        const myFolderSection = document.getElementById('myFolderSection');
+        const otherUserSection = document.getElementById('otherUserSection');
+        const targetUserInput = document.getElementById('targetUserInput');
+
+        if(sendToOtherCheck) {
+            sendToOtherCheck.addEventListener('change', (e) => {
+                if(e.target.checked) {
+                    myFolderSection.classList.add('hidden');
+                    otherUserSection.classList.remove('hidden');
+                    targetUserInput.focus();
+                } else {
+                    myFolderSection.classList.remove('hidden');
+                    otherUserSection.classList.add('hidden');
+                    targetUserInput.value = ''; // 초기화
+                }
+            });
+        }
+
         async function openFolderModal(jobId) {
             document.getElementById('selected-job-id').value = jobId;
+            
+            // UI 초기화 (항상 '내 폴더' 모드로 시작)
+            if(sendToOtherCheck) {
+                sendToOtherCheck.checked = false;
+                myFolderSection.classList.remove('hidden');
+                otherUserSection.classList.add('hidden');
+                targetUserInput.value = '';
+            }
+
             const modal = document.getElementById('folderModal');
             const content = document.getElementById('folderModalContent');
             const listContainer = document.getElementById('folder-list');
@@ -542,6 +586,49 @@
                 listContainer.innerHTML = '<div class="text-center py-4 text-red-400 text-xs">목록 로드 실패</div>';
             }
         }
+
+        // [수정] 전송 버튼 클릭 로직
+        document.getElementById('confirmImportBtn').addEventListener('click', async () => {
+             const jobId = document.getElementById('selected-job-id').value;
+             const btn = document.getElementById('confirmImportBtn');
+             const originalContent = btn.innerHTML;
+             
+             // 타겟 유저 확인
+             let targetUser = null;
+             if (sendToOtherCheck && sendToOtherCheck.checked) {
+                 targetUser = targetUserInput.value.trim();
+                 if (!targetUser) {
+                     alert("받을 사람의 아이디를 입력해주세요.");
+                     return;
+                 }
+             }
+
+             btn.disabled = true;
+             btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 처리 중...';
+             
+             const formData = new FormData();
+             formData.append('parent_id', selectedFolderId);
+             if (targetUser) {
+                 formData.append('target_user', targetUser);
+             }
+             
+             try {
+                const res = await fetch(`/api/docs/import/${jobId}`, { method: 'POST', body: formData });
+                if(res.ok) { 
+                    closeFolderModal(); 
+                    const msg = targetUser ? `${targetUser}님에게 전송되었습니다.` : '내 문서함에 저장되었습니다.';
+                    alert(msg); 
+                } else { 
+                    const e = await res.json(); 
+                    alert('오류: ' + (e.detail || '알 수 없는 오류')); 
+                }
+             } catch(e) { 
+                 alert('서버 통신 오류'); 
+             } finally { 
+                 btn.disabled = false; 
+                 btn.innerHTML = originalContent; 
+             }
+        });
 
         function closeFolderModal() {
             const modal = document.getElementById('folderModal');
@@ -620,35 +707,6 @@
                 }
             });
         }
-
-        document.getElementById('confirmImportBtn').addEventListener('click', async () => {
-             const jobId = document.getElementById('selected-job-id').value;
-             const btn = document.getElementById('confirmImportBtn');
-             const originalContent = btn.innerHTML;
-             
-             btn.disabled = true;
-             btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 저장 중...';
-             
-             const formData = new FormData();
-             formData.append('parent_id', selectedFolderId);
-             
-             try {
-                const res = await fetch(`/api/docs/import/${jobId}`, { method: 'POST', body: formData });
-                if(res.ok) { 
-                    closeFolderModal(); 
-                    alert('성공적으로 추가되었습니다.'); 
-                } else { 
-                    const e = await res.json(); 
-                    alert('오류: ' + (e.detail || '알 수 없는 오류')); 
-                }
-             } catch(e) { 
-                 alert('서버 통신 오류'); 
-             } finally { 
-                 btn.disabled = false; 
-                 btn.innerHTML = originalContent; 
-             }
-        });
-
         function updateClock() {
             document.getElementById('clock').textContent = new Date().toLocaleTimeString('ko-KR');
         }

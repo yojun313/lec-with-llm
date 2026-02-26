@@ -26,7 +26,75 @@ class DocManager:
         zip_path = shutil.make_archive(zip_output_base, 'zip', source_dir)
         return zip_path
     
-    # load_data, save_data 제거됨 (DB 사용으로 불필요)
+    @staticmethod
+    def rename_node(owner: str, node_id: str, new_name: str):
+        """노드(파일/폴더) 이름 변경"""
+        if not new_name or not new_name.strip():
+            return False
+            
+        # 소유권 확인 및 존재 여부 체크
+        node = docs_col.find_one({"id": node_id, "owner": owner})
+        if not node:
+            return False
+            
+        # 이름 업데이트
+        docs_col.update_one(
+            {"id": node_id},
+            {"$set": {"name": new_name.strip()}}
+        )
+        return True
+    
+    @staticmethod
+    def move_node(owner: str, node_id: str, target_parent_id: str = None):
+        """
+        문서/폴더 이동 로직
+        - owner: 소유자 확인용
+        - node_id: 이동할 대상의 ID
+        - target_parent_id: 이동할 목적지 폴더 ID (None이면 Root)
+        """
+        
+        # 1. 이동할 대상 노드 조회 (존재 여부 및 소유권 확인)
+        node = docs_col.find_one({"id": node_id, "owner": owner})
+        if not node:
+            return False
+
+        # 2. 제자리 이동이거나, 자기 자신을 타겟으로 하는 경우 방지
+        if node_id == target_parent_id:
+            return False
+        
+        # 이미 해당 폴더에 있는지 확인 (변경 사항 없으면 성공 처리)
+        if node.get("parent_id") == target_parent_id:
+            return True
+
+        # 3. 목적지 폴더 검증 (Root가 아닌 경우)
+        if target_parent_id:
+            target_folder = docs_col.find_one({"id": target_parent_id, "owner": owner})
+            
+            # 목적지가 존재하지 않거나 폴더가 아니면 실패
+            if not target_folder or target_folder["type"] != "folder":
+                return False
+
+            # 4. [중요] 순환 참조 방지 (폴더를 자신의 하위 폴더로 이동 불가)
+            if node["type"] == "folder":
+                # 목적지 폴더(target)의 조상을 거슬러 올라가며, 현재 이동하려는 폴더(node)가 있는지 확인
+                current_id = target_parent_id
+                while current_id:
+                    if current_id == node_id:
+                        return False  # 순환 감지됨 (이동 불가)
+                    
+                    # 현재 검사 중인 폴더의 부모를 찾음
+                    parent = docs_col.find_one({"id": current_id}, {"parent_id": 1})
+                    if not parent:
+                        break
+                    current_id = parent.get("parent_id")
+
+        # 5. 이동 실행 (DB 업데이트)
+        docs_col.update_one(
+            {"id": node_id},
+            {"$set": {"parent_id": target_parent_id}}
+        )
+        
+        return True
 
     @staticmethod
     def get_nodes(owner: str, parent_id: str = None):

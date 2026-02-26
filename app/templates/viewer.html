@@ -329,8 +329,9 @@
         // 1. Global State & Config
         // ==========================================
         const themeIcon = document.getElementById('themeIcon');
+        let draggedNodeId = null;
 
-        // 초기화: 저장된 설정 불러오기 (기본값: dark)
+        // 초기화: 저장된 테마 불러오기
         function initTheme() {
             const savedTheme = localStorage.getItem('theme');
             if (savedTheme === 'light') {
@@ -342,7 +343,6 @@
             }
         }
 
-        // 토글 함수
         function toggleTheme() {
             const html = document.documentElement;
             if (html.classList.contains('dark')) {
@@ -356,15 +356,16 @@
             }
         }
 
-        // 실행
         initTheme();
         
+        // 상태 변수들
         let viewMode = 'presentation'; 
         let openedTabs = []; 
         let activeTabId = null;
         let expandedFolderIds = new Set(); 
         let activeFileId = null;           
 
+        // DOM 요소 참조
         const nodeList = document.getElementById('nodeList');
         const zipInput = document.getElementById('zipInput');
         const dragOverlay = document.getElementById('dragOverlay');
@@ -390,10 +391,62 @@
         const zoomDisplay = document.getElementById('zoomDisplay');
         const body = document.body;
 
+        // ==========================================
+        // [핵심 변경] 2. Math Processing (Extension 방식)
+        // ==========================================
+        // 기존의 preprocessMath/postprocessMath를 제거하고,
+        // marked 파서가 수식을 만나면 즉시 KaTeX로 변환하도록 확장 기능을 등록합니다.
+        
+        const mathExtension = {
+            name: 'math',
+            level: 'inline', // 인라인/블록 모두 처리
+            start(src) { return src.match(/\$|\\\[|\\\(|^\$\$/)?.index; },
+            tokenizer(src, tokens) {
+                // 1. Block Math: $$...$$ 또는 \[...\]
+                const blockRule = /^(\$\$|\\\[)([\s\S]+?)(\$\$|\\\])/;
+                const blockMatch = blockRule.exec(src);
+                if (blockMatch) {
+                    return {
+                        type: 'math',
+                        raw: blockMatch[0],
+                        text: blockMatch[2].trim(),
+                        displayMode: true
+                    };
+                }
+                // 2. Inline Math: $...$ 또는 \(...\)
+                // (역슬래시가 없는 $만 매칭)
+                const inlineRule = /^(\$|\\\()((?:\\.|[^$\n])*?)(\$|\\\))/;
+                const inlineMatch = inlineRule.exec(src);
+                if (inlineMatch) {
+                    return {
+                        type: 'math',
+                        raw: inlineMatch[0],
+                        text: inlineMatch[2].trim(),
+                        displayMode: false
+                    };
+                }
+            },
+            renderer(token) {
+                try {
+                    return katex.renderToString(token.text, {
+                        displayMode: token.displayMode,
+                        throwOnError: false,
+                        output: 'html',
+                        trust: true
+                    });
+                } catch (err) {
+                    return `<span class="text-red-500 font-mono text-xs">Math Error</span>`;
+                }
+            }
+        };
+
+        // Marked 설정 및 확장 등록
         marked.setOptions({ breaks: true, gfm: true });
+        marked.use({ extensions: [mathExtension] });
+
 
         // ==========================================
-        // 2. Initialization
+        // 3. Initialization Logic
         // ==========================================
         if (localStorage.getItem('sidebarClosed') === 'true') {
             body.classList.add('sidebar-closed');
@@ -407,7 +460,7 @@
         restoreSession(); 
 
         // ==========================================
-        // 3. Tree View Logic
+        // 4. Tree View Logic
         // ==========================================
         async function loadTreeRoot() {
             nodeList.innerHTML = ''; 
@@ -443,24 +496,43 @@
             const isFolder = node.type === 'folder';
             const wrapper = document.createElement('div');
             wrapper.className = 'tree-node';
+            
+            const contentDiv = document.createElement('div');
+            contentDiv.className = `tree-content group ${node.id === activeFileId ? 'active' : ''}`;
+            contentDiv.style.paddingLeft = `${0.5 + (depth * 0.8)}rem`;
+            
+            // 드래그 앤 드롭
+            contentDiv.draggable = true;
+            contentDiv.ondragstart = (e) => handleDragStart(e, node.id);
+            if (isFolder) {
+                contentDiv.ondragover = (e) => handleDragOver(e);
+                contentDiv.ondragleave = (e) => handleDragLeave(e);
+                contentDiv.ondrop = (e) => handleDrop(e, node.id);
+            }
+
+            contentDiv.onclick = () => handleNodeClick(contentDiv, node.id, node.type, node.name.replace(/'/g, "\\'"), parentName);
+            
             let iconClass = isFolder ? 'fas fa-folder text-yellow-500' : 'fas fa-file-lines text-blue-400';
             if (isFolder && expandedFolderIds.has(node.id)) iconClass = 'fas fa-folder-open text-yellow-500';
-            const paddingLeft = 0.5 + (depth * 0.8);
 
-            wrapper.innerHTML = `
-                <div class="tree-content group ${node.id === activeFileId ? 'active' : ''}" 
-                     style="padding-left: ${paddingLeft}rem"
-                     onclick="handleNodeClick(this, '${node.id}', '${node.type}', '${node.name.replace(/'/g, "\\'")}', '${parentName}')">
-                    <span class="tree-arrow ${isFolder ? '' : 'invisible'}"><i class="fas fa-chevron-right"></i></span>
-                    <i class="${iconClass} mr-2 w-4 text-center opacity-80 node-icon"></i>
-                    <span class="truncate text-sm select-none flex-1">${node.name}</span>
-                    <div class="flex items-center space-x-1 opacity-0 group-hover:opacity-100 ml-2" onclick="event.stopPropagation()">
-                        ${!isFolder ? `<button onclick="downloadFile(event, '${node.id}')" class="text-notion-muted hover:text-green-400 p-1"><i class="fas fa-download text-xs"></i></button>` : ''}
-                        <button onclick="deleteNode(event, '${node.id}')" class="text-notion-muted hover:text-red-400 p-1"><i class="fas fa-trash-alt text-xs"></i></button>
-                    </div>
+            contentDiv.innerHTML = `
+                <span class="tree-arrow ${isFolder ? '' : 'invisible'}"><i class="fas fa-chevron-right"></i></span>
+                <i class="${iconClass} mr-2 w-4 text-center opacity-80 node-icon"></i>
+                <span class="truncate text-sm select-none flex-1 pointer-events-none">${node.name}</span>
+                
+                <div class="flex items-center space-x-1 opacity-0 group-hover:opacity-100 ml-2" onclick="event.stopPropagation()">
+                    <button onclick="renameNode(event, '${node.id}', '${node.name.replace(/'/g, "\\'")}')" class="text-notion-muted hover:text-blue-400 p-1" title="이름 변경"><i class="fas fa-pen text-xs"></i></button>
+                    ${!isFolder ? `<button onclick="downloadFile(event, '${node.id}')" class="text-notion-muted hover:text-green-400 p-1" title="다운로드"><i class="fas fa-download text-xs"></i></button>` : ''}
+                    <button onclick="deleteNode(event, '${node.id}')" class="text-notion-muted hover:text-red-400 p-1" title="삭제"><i class="fas fa-trash-alt text-xs"></i></button>
                 </div>
-                ${isFolder ? `<div class="tree-children" id="children-${node.id}"></div>` : ''}
             `;
+            wrapper.appendChild(contentDiv);
+            if (isFolder) {
+                const childrenDiv = document.createElement('div');
+                childrenDiv.className = 'tree-children';
+                childrenDiv.id = `children-${node.id}`;
+                wrapper.appendChild(childrenDiv);
+            }
             return wrapper;
         }
 
@@ -515,8 +587,16 @@
         }
 
         // ==========================================
-        // 4. Tab & Document Logic
+        // 5. Document Loading & Parsing
         // ==========================================
+        
+        // OCR 오류나 백엔드 아티팩트(MATH_inline_...) 등을 복구
+        function cleanUpContent(content) {
+            // "MATH_inline_302" 같은 텍스트를 "$MATH\_inline\_{302}$" 형태의 수식으로 변환
+            content = content.replace(/\bMATH_inline_(\d+)\b/g, '$MATH\\_inline\\_{$1}$');
+            return content;
+        }
+
         async function openDoc(node, initialIndex = 0, parentName = 'root') {
             const existingTab = openedTabs.find(tab => tab.id === node.id);
             if (existingTab) { switchTab(node.id); return; }
@@ -524,24 +604,77 @@
                 const res = await fetch(`/api/docs/content/${node.id}`); 
                 if (!res.ok) throw new Error("Load failed");
                 const data = await res.json();
-                const processed = preprocessMath(data.content);
-                const parsedSlides = parseSlides(data.content, processed.mathMap);
+                
+                // 1. 콘텐츠 정제
+                const cleanContent = cleanUpContent(data.content);
+                
+                // 2. Markdown -> HTML 변환 (KaTeX가 자동으로 적용됨)
+                const htmlContent = marked.parse(cleanContent);
+                
+                // 3. 슬라이드 분리 (HTML 파싱)
+                const slides = parseSlidesFromHtml(htmlContent);
+                
                 let displayName = node.name;
                 if (parentName && parentName !== 'root') displayName = `${parentName}/${node.name}`;
+                
                 const newTab = {
-                    id: node.id, name: displayName, content: data.content,
-                    processedContent: marked.parse(processed.content),
-                    mathMap: processed.mathMap, slides: parsedSlides,
-                    currentIndex: initialIndex, zoom: 100
+                    id: node.id, 
+                    name: displayName, 
+                    content: cleanContent, // 원본 마크다운
+                    processedHtml: htmlContent, // 렌더링된 HTML
+                    slides: slides,
+                    currentIndex: initialIndex, 
+                    zoom: 100
                 };
                 openedTabs.push(newTab);
                 renderTabBar();
                 switchTab(newTab.id);
                 saveSession();
                 if (window.innerWidth < 768) toggleSidebar(false);
-            } catch (err) { alert("문서를 불러올 수 없습니다."); }
+            } catch (err) { 
+                console.error(err);
+                alert("문서를 불러올 수 없습니다."); 
+            }
         }
 
+        // HTML 문자열을 받아 슬라이드 단위로 분리하는 함수
+        function parseSlidesFromHtml(fullHtml) {
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = fullHtml;
+            const slides = []; 
+            let currentSlide = null;
+            
+            Array.from(tempDiv.children).forEach(child => {
+                // H2 태그에 'slide'라는 단어가 있으면 새 슬라이드로 인식
+                const isHeader = child.tagName === 'H2';
+                const isSlideHeader = isHeader && child.innerText.toLowerCase().includes('slide');
+                
+                if (isSlideHeader) {
+                    if (currentSlide) slides.push(currentSlide);
+                    currentSlide = { image: null, htmlParts: [] };
+                    currentSlide.htmlParts.push(child.outerHTML); 
+                    return;
+                }
+                
+                if (!currentSlide) currentSlide = { image: null, htmlParts: [] };
+                
+                // 이미지 추출
+                const img = child.querySelector('img') || (child.tagName === 'IMG' ? child : null);
+                if (img) {
+                    if (!currentSlide.image) currentSlide.image = img.src; 
+                    else currentSlide.htmlParts.push(child.outerHTML);
+                } else if (child.tagName !== 'HR') {
+                    // HR 태그는 무시하고 나머지는 추가
+                    currentSlide.htmlParts.push(child.outerHTML);
+                }
+            });
+            if (currentSlide) slides.push(currentSlide);
+            return slides;
+        }
+
+        // ==========================================
+        // 6. Tab & Rendering Logic
+        // ==========================================
         function renderTabBar() {
             tabBar.innerHTML = '';
             if (openedTabs.length === 0) { tabBar.classList.add('hidden'); return; }
@@ -582,20 +715,33 @@
             document.querySelectorAll('.tree-content').forEach(c => c.classList.remove('active'));
             const treeItem = document.querySelector(`.tree-content[onclick*="${id}"]`);
             if(treeItem) treeItem.classList.add('active');
+            
             saveSession();
+            
             const tab = openedTabs.find(t => t.id === id);
             if (!tab) return;
+            
             renderTabBar();
             emptyView.classList.add('hidden');
             toolbar.style.display = 'flex';
-            markdownBody.innerHTML = tab.processedContent;
-            postprocessMath(markdownBody, tab.mathMap);
+            
+            // 스크롤 모드 렌더링
+            markdownBody.innerHTML = tab.processedHtml;
+            hljs.highlightAll(); // 코드 하이라이팅 적용
+
+            // 뷰 모드 설정
             setViewMode('presentation');
-            renderCurrentSlide();
+            renderCurrentSlide(); // 프레젠테이션 모드 렌더링
             applyFontSize();
         }
 
         function getActiveTab() { return openedTabs.find(t => t.id === activeTabId); }
+
+        function saveSession() {
+            const sessionData = openedTabs.map(t => ({ id: t.id, name: t.name, currentIndex: t.currentIndex || 0 }));
+            localStorage.setItem('viewer_tabs', JSON.stringify(sessionData));
+            localStorage.setItem('viewer_active_id', activeTabId || '');
+        }
 
         async function restoreSession() {
             const savedTabsJSON = localStorage.getItem('viewer_tabs');
@@ -611,14 +757,8 @@
             }
         }
 
-        function saveSession() {
-            const sessionData = openedTabs.map(t => ({ id: t.id, name: t.name, currentIndex: t.currentIndex || 0 }));
-            localStorage.setItem('viewer_tabs', JSON.stringify(sessionData));
-            localStorage.setItem('viewer_active_id', activeTabId || '');
-        }
-
         // ==========================================
-        // 5. Viewer & Presentation Logic
+        // 7. Viewer Control & Interaction
         // ==========================================
         viewModeBtn.addEventListener('click', () => { if (viewMode === 'scroll') setViewMode('presentation'); else setViewMode('scroll'); });
 
@@ -640,48 +780,6 @@
             }
         }
 
-        // applyNotionMathLogic (복사된 로직)
-        function applyNotionMathLogic(html) {
-            const protectedMap = {}; let protectedIndex = 0;
-            html = html.replace(/(\$\$[\s\S]+?\$\$|(?<!\\)\$[^$]+\$|<[^>]+>)/g, (match) => {
-                const token = `__PROTECTED_${protectedIndex++}__`; protectedMap[token] = match; return token;
-            });
-            html = html.replace(/\bO\s*\(([^)<>]+)\)/g, (match, inner) => `$O(${inner})$`);
-            html = html.replace(/\b(sum|prod|lim|int)_(\{([^\}]+)\}|[a-zA-Z0-9]+)(\^(\{([^\}]+)\}|[a-zA-Z0-9]+))?/g, (match) => `$\\${match.replace(/ /g, '')}$`);
-            html = html.replace(/\b(log|ln|sin|cos|tan|exp)(_([a-zA-Z0-9]+|\{[^}]+\}))?\s+([a-zA-Z0-9\(\)]+)/g, (match, f, _, b, a) => {
-                const bp = b ? `_{${b.replace(/[{}]/g, '')}}` : ''; return `$\\${f}${bp}\\ ${a}$`;
-            });
-            html = html.replace(/(\([^\)]+\)|[a-zA-Z0-9]+)\^(\{([^\}]+)\}|\[[^\]]+\]|\([^\)]+\)|[a-zA-Z0-9\.]+)/g, (match, b, e) => {
-                let ce = e; if (ce.startsWith('{') && ce.endsWith('}')) ce = ce.slice(1, -1); return `$${b}^{${ce}}$`;
-            });
-            html = html.replace(/\b([a-zA-Z])_([a-zA-Z0-9]+)\b/g, (match, b, s) => `$${b}_{${s}}$`);
-            html = html.replace(/(?<!\$|\w)(\b[a-zA-Z][a-zA-Z0-9\(\)]*\s*(=|≈|≤|≥|<|>)\s*[a-zA-Z0-9_\^\(\)\+\-\*\/ \.]+(?!\$))/g, (match) => `$${match}$`);
-            Object.keys(protectedMap).forEach(token => { html = html.replace(token, protectedMap[token]); });
-            return html;
-        }
-
-        function parseSlides(content, mathMap) {
-            const processed = preprocessMath(content);
-            const html = marked.parse(processed.content);
-            const tempDiv = document.createElement('div');
-            tempDiv.innerHTML = html;
-            const slides = []; let currentSlide = null;
-            Array.from(tempDiv.children).forEach(child => {
-                if (child.tagName === 'H2' && child.innerText.toLowerCase().includes('slide')) {
-                    if (currentSlide) slides.push(currentSlide);
-                    currentSlide = { image: null, htmlParts: [] };
-                    currentSlide.htmlParts.push(child.outerHTML); return;
-                }
-                if (!currentSlide) currentSlide = { image: null, htmlParts: [] };
-                const img = child.querySelector('img') || (child.tagName === 'IMG' ? child : null);
-                if (img) {
-                    if (!currentSlide.image) currentSlide.image = img.src; else currentSlide.htmlParts.push(child.outerHTML);
-                } else if (child.tagName !== 'HR') currentSlide.htmlParts.push(child.outerHTML);
-            });
-            if (currentSlide) slides.push(currentSlide);
-            return slides;
-        }
-
         function renderCurrentSlide() {
             const tab = getActiveTab(); if (!tab || tab.slides.length === 0) return;
             const slide = tab.slides[tab.currentIndex];
@@ -690,10 +788,11 @@
             } else {
                 slideImage.classList.add('hidden'); noImageText.classList.remove('hidden');
             }
-            let rawHtml = slide.htmlParts.join('');
-            rawHtml = applyNotionMathLogic(rawHtml);
-            slideText.innerHTML = rawHtml;
-            postprocessMath(slideText, tab.mathMap);
+            
+            // HTML 조립 및 삽입
+            slideText.innerHTML = slide.htmlParts.join('');
+            hljs.highlightAll(); // 코드 하이라이팅 재적용
+
             pageIndicator.textContent = `${tab.currentIndex + 1} / ${tab.slides.length}`;
             prevSlideBtn.disabled = tab.currentIndex === 0;
             nextSlideBtn.disabled = tab.currentIndex === tab.slides.length - 1;
@@ -706,21 +805,12 @@
         nextSlideBtn.addEventListener('click', () => { 
             const tab = getActiveTab(); if (tab && tab.currentIndex < tab.slides.length - 1) { tab.currentIndex++; renderCurrentSlide(); saveSession(); } 
         });
-        document.addEventListener('keydown', (e) => {
-            // 1. 입력창에서는 단축키 작동 중지
-            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
         
-            if (e.code === 'KeyF' && !e.ctrlKey && !e.altKey && !e.metaKey) {
-                e.preventDefault(); // 브라우저 기본 동작 방지
-                toggleFullScreen();
-                return;
-            }
-            if (e.code === 'KeyD' && !e.ctrlKey && !e.altKey && !e.metaKey) {
-                e.preventDefault(); 
-                toggleTheme();
-                return;
-            }
-    
+        // 키보드 이벤트
+        document.addEventListener('keydown', (e) => {
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+            if (e.code === 'KeyF' && !e.ctrlKey && !e.altKey && !e.metaKey) { e.preventDefault(); toggleFullScreen(); return; }
+            if (e.code === 'KeyD' && !e.ctrlKey && !e.altKey && !e.metaKey) { e.preventDefault(); toggleTheme(); return; }
             if (viewMode !== 'presentation') return;
             if (e.code === 'ArrowLeft') prevSlideBtn.click();
             if (e.code === 'ArrowRight') nextSlideBtn.click();
@@ -736,20 +826,13 @@
             slideText.style.fontSize = `${tab.zoom}%`; zoomDisplay.textContent = `${tab.zoom}%`;
         }
 
-        // ==========================================
-        // 5-1. Touch Swipe Logic (Mobile Presentation)
-        // ==========================================
+        // 터치 스와이프 로직
         let touchStartX = 0;
         let touchEndX = 0;
-        
-        // [수정 1] 전체 화면 대신 '이미지 영역'만 선택
         const swipeTarget = document.querySelector('.split-image-container');
 
         if (swipeTarget) {
-            swipeTarget.addEventListener('touchstart', (e) => {
-                touchStartX = e.changedTouches[0].screenX;
-            }, { passive: true });
-
+            swipeTarget.addEventListener('touchstart', (e) => { touchStartX = e.changedTouches[0].screenX; }, { passive: true });
             swipeTarget.addEventListener('touchend', (e) => {
                 touchEndX = e.changedTouches[0].screenX;
                 handleSwipe();
@@ -758,24 +841,13 @@
 
         function handleSwipe() {
             if (viewMode !== 'presentation') return;
-            
-            // [수정 2] 감도 조절: 50 -> 100 (숫자가 클수록 더 길게 밀어야 넘어감)
             const SWIPE_THRESHOLD = 100; 
-            
-            if (touchEndX < touchStartX - SWIPE_THRESHOLD) {
-                // 왼쪽으로 길게 스와이프 -> 다음
-                nextSlideBtn.click();
-            }
-            
-            if (touchEndX > touchStartX + SWIPE_THRESHOLD) {
-                // 오른쪽으로 길게 스와이프 -> 이전
-                prevSlideBtn.click();
-            }
+            if (touchEndX < touchStartX - SWIPE_THRESHOLD) nextSlideBtn.click();
+            if (touchEndX > touchStartX + SWIPE_THRESHOLD) prevSlideBtn.click();
         }
 
-
         // ==========================================
-        // 6. Fullscreen & UI Utils
+        // 8. Fullscreen & Misc Utils
         // ==========================================
         function toggleFullScreen() {
             const isFullscreen = body.classList.contains('fullscreen-mode');
@@ -806,18 +878,26 @@
         closeSidebarBtn.addEventListener('click', () => toggleSidebar(false));
         sidebarOverlay.addEventListener('click', () => toggleSidebar(false));
 
+        // ==========================================
+        // 9. File Operations (Upload, Rename, Delete)
+        // ==========================================
         let dragCounter = 0;
-        body.addEventListener('dragenter', (e) => { e.preventDefault(); dragCounter++; dragOverlay.classList.add('active'); });
-        body.addEventListener('dragleave', (e) => { e.preventDefault(); dragCounter--; if (dragCounter === 0) dragOverlay.classList.remove('active'); });
-        body.addEventListener('dragover', (e) => { e.preventDefault(); });
+        body.addEventListener('dragenter', (e) => { 
+            if (draggedNodeId) return; 
+            if (e.dataTransfer.types && !Array.from(e.dataTransfer.types).includes('Files')) return;
+            e.preventDefault(); dragCounter++; dragOverlay.classList.add('active'); 
+        });
+        body.addEventListener('dragleave', (e) => { 
+            if (draggedNodeId) return; 
+            e.preventDefault(); dragCounter--; if (dragCounter === 0) dragOverlay.classList.remove('active'); 
+        });
+        body.addEventListener('dragover', (e) => { if (draggedNodeId) return; e.preventDefault(); });
         body.addEventListener('drop', async (e) => {
+            if (draggedNodeId) return; 
             e.preventDefault(); dragCounter = 0; dragOverlay.classList.remove('active');
             if (e.dataTransfer.files[0]) handleFileUpload(e.dataTransfer.files[0]);
         });
 
-        // ==========================================
-        // 7. CRUD Operations
-        // ==========================================
         async function handleFileUpload(file) {
             const formData = new FormData(); formData.append('file', file); formData.append('parent_id', 'root');
             const btn = document.getElementById('uploadBtn'); const org = btn.innerHTML; btn.innerHTML='<i class="fas fa-spinner fa-spin"></i>'; btn.disabled=true;
@@ -838,26 +918,29 @@
             const img = document.getElementById('slideImage'); if (!img || img.classList.contains('hidden')) return alert('이미지 없음');
             try { const blob = await (await fetch(img.src)).blob(); await navigator.clipboard.write([new ClipboardItem({ [blob.type]: blob })]); alert('이미지 복사 완료'); } catch(e) { alert('복사 실패'); }
         }
+        async function renameNode(e, id, currentName) {
+            e.stopPropagation();
+            const newName = prompt("새 이름을 입력하세요:", currentName);
+            if (newName === null || newName.trim() === "" || newName === currentName) return;
+            try {
+                const res = await fetch('/api/docs/rename', {
+                    method: 'PUT', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ node_id: id, new_name: newName })
+                });
+                if (res.ok) {
+                    loadTreeRoot();
+                    const tab = openedTabs.find(t => t.id === id);
+                    if (tab) {
+                        tab.name = tab.name.substring(0, tab.name.lastIndexOf('/') + 1) + newName;
+                        renderTabBar(); saveSession();
+                    }
+                } else { const err = await res.json(); alert('변경 실패: ' + (err.detail || '오류 발생')); }
+            } catch (err) { alert('서버 통신 오류'); }
+        }
 
         // ==========================================
-        // 8. MathJax / History Modal
+        // 10. History Modal & Drag Move
         // ==========================================
-        function preprocessMath(content) {
-            const mathMap = [];
-            content = content.replace(/\$\$([\s\S]+?)\$\$/g, (m, c) => { const id = `MB_${mathMap.length}`; mathMap.push({id, c, t:'b'}); return id; });
-            content = content.replace(/\\\[([\s\S]+?)\\\]/g, (m, c) => { const id = `MB_${mathMap.length}`; mathMap.push({id, c, t:'b'}); return id; });
-            content = content.replace(/\$([^$\n]+?)\$/g, (m, c) => { const id = `MI_${mathMap.length}`; mathMap.push({id, c, t:'i'}); return id; });
-            content = content.replace(/\\\(([\s\S]+?)\\\)/g, (m, c) => { const id = `MI_${mathMap.length}`; mathMap.push({id, c, t:'i'}); return id; });
-            return { content, mathMap };
-        }
-        function postprocessMath(element, mathMap) {
-            let html = element.innerHTML;
-            mathMap.forEach(i => { html = html.replace(i.id, i.t==='b' ? `$$${i.c}$$` : `$${i.c}$`); });
-            element.innerHTML = html;
-            renderMathInElement(element, { delimiters: [{left:'$$', right:'$$', display:true}, {left:'$', right:'$', display:false}], throwOnError: false });
-            hljs.highlightAll();
-        }
-
         const historyModal = document.getElementById('historyModal');
         const historyList = document.getElementById('historyList');
         function openHistoryModal() {
@@ -875,13 +958,11 @@
             historyList.innerHTML = '<div class="text-center text-notion-muted py-8"><i class="fas fa-spinner fa-spin text-2xl mb-2"></i><p>로딩 중...</p></div>';
             try { const res = await fetch('/api/docs/history'); if (!res.ok) throw new Error; const jobs = await res.json(); renderHistoryList(jobs); } catch (err) { historyList.innerHTML = '<div class="text-center text-red-400 py-8"><p>불러오기 실패</p></div>'; }
         }
-
         function renderHistoryList(jobs) {
             historyList.innerHTML = '';
             if (jobs.length === 0) { historyList.innerHTML = '<div class="text-center text-notion-muted py-10"><p>작업 없음</p></div>'; return; }
             jobs.forEach(job => {
                 const item = document.createElement('div');
-                // bg-notion-sidebar, text-notion-text 적용
                 item.className = 'flex items-center justify-between p-3 mb-1 bg-notion-sidebar border border-notion-border rounded-lg hover:border-purple-500/50 transition group';
                 item.innerHTML = `
                     <div class="flex-1 min-w-0 mr-4"><div class="text-sm font-medium text-notion-text truncate">${job.filename}</div></div>
@@ -894,6 +975,30 @@
             if (!confirm('가져오시겠습니까?')) return;
             const formData = new FormData(); formData.append('parent_id', 'root');
             try { const res = await fetch(`/api/docs/import/${jobId}`, { method: 'POST', body: formData }); if (!res.ok) throw new Error; closeHistoryModal(); loadTreeRoot(); } catch (err) { alert('실패'); }
+        }
+
+        // Tree Drag & Drop (이동)
+        function handleDragStart(e, id) { e.stopPropagation(); draggedNodeId = id; e.dataTransfer.effectAllowed = 'move'; e.target.style.opacity = '0.5'; }
+        function handleDragOver(e) { e.preventDefault(); e.stopPropagation(); e.currentTarget.classList.add('bg-blue-500/20'); }
+        function handleDragLeave(e) { e.preventDefault(); e.stopPropagation(); e.currentTarget.classList.remove('bg-blue-500/20'); }
+        async function handleDrop(e, targetFolderId) {
+            e.preventDefault(); e.stopPropagation(); e.currentTarget.classList.remove('bg-blue-500/20');
+            document.querySelectorAll('.tree-content').forEach(el => el.style.opacity = '1');
+            if (!draggedNodeId || draggedNodeId === targetFolderId) return;
+            if (!confirm('이동하시겠습니까?')) return;
+            try {
+                const res = await fetch('/api/docs/move', {
+                    method: 'PUT', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ node_id: draggedNodeId, target_parent_id: targetFolderId })
+                });
+                if (res.ok) {
+                    loadTreeRoot();
+                    if (expandedFolderIds.has(targetFolderId)) {
+                        const targetChildrenContainer = document.getElementById(`children-${targetFolderId}`);
+                        if(targetChildrenContainer) loadFolderChildren(targetFolderId, targetChildrenContainer, 0, '');
+                    }
+                } else { const err = await res.json(); alert('이동 실패: ' + (err.detail || '오류')); }
+            } catch (err) { alert('서버 통신 오류'); } finally { draggedNodeId = null; }
         }
     </script>
 </body>

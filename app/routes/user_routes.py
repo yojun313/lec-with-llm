@@ -4,6 +4,7 @@ from typing import Optional, Any
 from pydantic import BaseModel
 from app.services.auth_manager import AuthManager
 from app.routes.deps import get_current_user
+from app.db.prompt import default_system_prompt, default_user_prompt
 import shutil
 import os
 
@@ -53,6 +54,13 @@ async def save_settings(
 async def get_usage_info(user: str = Depends(get_current_user)):
     total_usd = AuthManager.get_user_usage(user)
     return {"total_spent_usd": round(total_usd, 4)}
+
+@router.get("/settings/default_prompts")
+async def get_default_prompts(user: str = Depends(get_current_user)):
+    return {
+        "system_prompt": default_system_prompt,
+        "user_prompt": default_user_prompt
+    }
 
 @router.post("/user/profile-image")
 async def upload_profile_image(
